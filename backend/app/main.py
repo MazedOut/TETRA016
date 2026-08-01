@@ -30,3 +30,7 @@ def health_check():
 
 from app.api import routes_upload
 app.include_router(routes_upload.router, prefix="/upload", tags=["upload"])
+
+from app.api import routes_tickets, routes_dashboard
+app.include_router(routes_tickets.router, prefix="/tickets", tags=["tickets"])
+app.include_router(routes_dashboard.router, prefix="/dashboard", tags=["dashboard"])
