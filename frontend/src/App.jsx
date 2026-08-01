@@ -5,6 +5,8 @@ import ExceptionQueue from "./pages/ExceptionQueue.jsx";
 import InvoiceDetail from "./pages/InvoiceDetail.jsx";
 import UploadBatch from "./pages/UploadBatch.jsx";
 import Reports from "./pages/Reports.jsx";
+import { ModeProvider, useMode } from "./context/ModeContext.jsx";
+import { resetDemoData } from "./api/client.js";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", end: true },
@@ -14,7 +16,26 @@ const NAV_ITEMS = [
 ];
 
 function Shell({ children }) {
-  const [mode, setMode] = useState("auditor"); // Auditor / MSME mode toggle
+  const { mode, setMode } = useMode();
+  const [resetting, setResetting] = useState(false);
+  const [resetMsg, setResetMsg] = useState("");
+
+  async function handleReset() {
+    if (!window.confirm("Clear all test invoices and tickets from the database?")) return;
+    setResetting(true);
+    try {
+      await resetDemoData();
+      setResetMsg("Data cleared!");
+      setTimeout(() => {
+        setResetMsg("");
+        window.location.reload();
+      }, 800);
+    } catch (e) {
+      setResetMsg("Reset failed");
+    } finally {
+      setResetting(false);
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -46,19 +67,30 @@ function Shell({ children }) {
             ))}
           </nav>
 
-          <div className="flex items-center gap-2 bg-ink-700 rounded-full p-1 text-xs font-mono">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setMode("auditor")}
-              className={"px-3 py-1 rounded-full transition-colors " + (mode === "auditor" ? "bg-paper text-ink" : "text-paper/60")}
+              onClick={handleReset}
+              disabled={resetting}
+              className="text-xs font-mono px-2.5 py-1 rounded bg-ink-700 hover:bg-stamp-red/20 text-paper/80 hover:text-stamp-red border border-ink-600 transition-colors"
+              title="Dev Tool: Wipe Invoice and Ticket tables"
             >
-              Auditor
+              {resetMsg || (resetting ? "Resetting..." : "Reset demo data")}
             </button>
-            <button
-              onClick={() => setMode("msme")}
-              className={"px-3 py-1 rounded-full transition-colors " + (mode === "msme" ? "bg-paper text-ink" : "text-paper/60")}
-            >
-              MSME
-            </button>
+
+            <div className="flex items-center gap-2 bg-ink-700 rounded-full p-1 text-xs font-mono">
+              <button
+                onClick={() => setMode("auditor")}
+                className={"px-3 py-1 rounded-full transition-colors " + (mode === "auditor" ? "bg-paper text-ink" : "text-paper/60")}
+              >
+                Auditor
+              </button>
+              <button
+                onClick={() => setMode("msme")}
+                className={"px-3 py-1 rounded-full transition-colors " + (mode === "msme" ? "bg-paper text-ink" : "text-paper/60")}
+              >
+                MSME
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -76,16 +108,18 @@ function Shell({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Shell>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/exceptions" element={<ExceptionQueue />} />
-          <Route path="/invoices/:id" element={<InvoiceDetail />} />
-          <Route path="/upload" element={<UploadBatch />} />
-          <Route path="/reports" element={<Reports />} />
-        </Routes>
-      </Shell>
-    </BrowserRouter>
+    <ModeProvider>
+      <BrowserRouter>
+        <Shell>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/exceptions" element={<ExceptionQueue />} />
+            <Route path="/invoices/:id" element={<InvoiceDetail />} />
+            <Route path="/upload" element={<UploadBatch />} />
+            <Route path="/reports" element={<Reports />} />
+          </Routes>
+        </Shell>
+      </BrowserRouter>
+    </ModeProvider>
   );
 }

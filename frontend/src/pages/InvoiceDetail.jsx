@@ -4,10 +4,27 @@ import { Document, Page } from "react-pdf";
 import { fetchInvoiceDetail } from "../api/client.js";
 import ResolutionForm from "../components/ResolutionForm.jsx";
 import VendorCorrectionForm from "../components/VendorCorrectionForm.jsx";
+import { useMode } from "../context/ModeContext.jsx";
 
-/**
- * Source document preview side-by-side with extracted fields and rule violations.
- */
+const EXCEPTION_TITLES = {
+  duplicate_invoice: "Duplicate Invoice Detected",
+  invalid_gstin: "Invalid GSTIN Checksum",
+  amount_mismatch: "Amount / Tax Mismatch",
+  internal_math_error: "Subtotal Math Calculation Error",
+  phantom_vendor: "Unregistered / Phantom Vendor",
+  typo_squatting_vendor: "Vendor Name Typo-Squatting",
+  pdf_metadata_tamper: "PDF Document Metadata Modified",
+  invisible_text_detected: "Hidden Text Detected",
+  benford_deviation: "Benford Law Numeric Anomaly",
+  vendor_activity_anomaly: "Vendor Volume Anomaly",
+};
+
+function confidenceColor(scorePct) {
+  if (scorePct >= 80) return "text-stamp-green font-bold";
+  if (scorePct >= 60) return "text-stamp-amber font-bold";
+  return "text-stamp-red font-bold";
+}
+
 function buildDisputeMailto(invoice) {
   const subject = encodeURIComponent(`Query regarding invoice ${invoice.id}`);
   const flagLines = (invoice.flags || []).map((f) => `- ${f.type}: ${f.detail}`).join("\n");
@@ -19,6 +36,7 @@ function buildDisputeMailto(invoice) {
 
 export default function InvoiceDetail() {
   const { id } = useParams();
+  const { mode } = useMode();
   const [invoice, setInvoice] = useState(null);
   const [showResolve, setShowResolve] = useState(false);
   const [showVendorCorrect, setShowVendorCorrect] = useState(false);
@@ -30,6 +48,8 @@ export default function InvoiceDetail() {
 
   if (!invoice) return <p className="text-sm text-paper/60">Loading invoice…</p>;
 
+  const overallConfPct = Math.round((invoice.extractionConfidence || 0) * 100);
+
   return (
     <div className="space-y-6">
       <div className="flex items-baseline justify-between flex-wrap gap-3">
@@ -38,7 +58,7 @@ export default function InvoiceDetail() {
             &larr; back to queue
           </Link>
           <h2 className="font-display text-2xl font-semibold mt-1">{invoice.id}</h2>
-          <p className="text-sm text-paper/60">{invoice.vendor}</p>
+          <p className="text-sm text-paper/60">{invoice.vendor} &bull; <span className="font-mono text-xs">{invoice.gstin}</span></p>
         </div>
         <div className="flex gap-2">
           <a href={buildDisputeMailto(invoice)} className="bg-ink-700 border border-ink-600 text-paper px-4 py-2 rounded-md text-sm font-medium hover:bg-ink-600">
@@ -79,33 +99,46 @@ export default function InvoiceDetail() {
           <div>
             <div className="flex justify-between items-baseline mb-1">
               <span className="text-[11px] uppercase tracking-wider text-ink-600 font-mono">Overall extraction confidence</span>
-              <span className="text-xs font-mono text-ink-700">{Math.round(invoice.extractionConfidence * 100)}%</span>
+              <span className={`text-xs font-mono ${confidenceColor(overallConfPct)}`}>{overallConfPct}%</span>
             </div>
             <div className="h-1.5 w-full bg-paper-dim rounded-full overflow-hidden">
-              <div className="h-full bg-ink-700 rounded-full" style={{ width: `${invoice.extractionConfidence * 100}%` }} />
+              <div
+                className={"h-full rounded-full " + (overallConfPct >= 80 ? "bg-stamp-green" : overallConfPct >= 60 ? "bg-stamp-amber" : "bg-stamp-red")}
+                style={{ width: `${overallConfPct}%` }}
+              />
             </div>
           </div>
 
           <div className="space-y-3 pt-2">
-            {invoice.fields.map((f) => (
-              <div key={f.label} className="flex items-center justify-between border-b border-ink-600/10 pb-2">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-ink-600 font-mono">{f.label}</p>
-                  <p className="font-mono text-sm">{f.value}</p>
+            {invoice.fields?.map((f) => {
+              const confPct = Math.round((f.confidence || 0) * 100);
+              return (
+                <div key={f.label} className="flex items-center justify-between border-b border-ink-600/10 pb-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-ink-600 font-mono">{f.label}</p>
+                    <p className="font-mono text-sm">{f.value || <span className="text-ink-600 italic">null</span>}</p>
+                  </div>
+                  <span className={`text-xs font-mono ${confidenceColor(confPct)}`}>{confPct}%</span>
                 </div>
-                <span className="text-xs font-mono text-ink-600">{Math.round(f.confidence * 100)}%</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {invoice.flags?.length > 0 && (
-            <div className="bg-stamp-red/10 border border-stamp-red/30 rounded-md p-4">
-              <p className="text-xs uppercase tracking-wider font-mono text-stamp-red mb-2">Flags raised</p>
-              {invoice.flags.map((f, i) => (
-                <p key={i} className="text-sm">
-                  <span className="font-medium">{f.type}:</span> {f.detail}
-                </p>
-              ))}
+            <div className="bg-stamp-red/10 border border-stamp-red/30 rounded-md p-4 space-y-3">
+              <p className="text-xs uppercase tracking-wider font-mono text-stamp-red font-bold">
+                Flags raised ({mode === "msme" ? "MSME Plain Language" : "Auditor View"})
+              </p>
+              {invoice.flags.map((f, i) => {
+                const title = mode === "msme" ? (EXCEPTION_TITLES[f.type] || f.type) : f.type;
+                const narrative = mode === "msme" ? (f.msmeNarrative || f.detail) : f.detail;
+                return (
+                  <div key={i} className="text-sm border-b border-stamp-red/20 pb-2 last:border-0 last:pb-0">
+                    <span className="font-mono font-semibold text-xs text-stamp-red block">{title}</span>
+                    <p className="text-xs mt-1 text-ink leading-relaxed">{narrative}</p>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

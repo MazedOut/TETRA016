@@ -11,7 +11,8 @@ class Ticket(Base):
     exception_type = Column(String, index=True)              # duplicate, gstin_invalid, mismatch, etc.
     status = Column(String, default="open")                   # open / in-review / resolved / escalated
     risk_contribution = Column(Integer, default=0)
-    narrative = Column(String, nullable=True)                 # AI-generated explanation
+    narrative = Column(String, nullable=True)                 # AI-generated explanation (auditor technical)
+    msme_narrative = Column(String, nullable=True)            # AI-generated explanation (plain MSME language)
     resolution_reason = Column(String, nullable=True)
     is_false_positive = Column(Integer, default=0)
     merged_into_ticket_id = Column(Integer, nullable=True)

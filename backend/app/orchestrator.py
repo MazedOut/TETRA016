@@ -7,6 +7,7 @@ from app.reconciliation.gstin_validator import validate as gstin_validate
 from app.reconciliation.duplicate_detector import detect_duplicates
 from app.scoring.risk_scorer import score_invoice
 from app.ai_layer.narrative_generator import generate_narratives
+from app.ai_layer.msme_translator import translate_for_msme
 from app.audit_trail.ticket_manager import create_ticket
 from app.audit_trail.hash_sealer import seal
 from app.models.invoice import Invoice
@@ -83,6 +84,10 @@ def process_invoice(db: Session, filename: str, extraction: dict, forensics: dic
 
     scoring = score_invoice(flags)
     scoring = generate_narratives(scoring)
+    try:
+        scoring = translate_for_msme(scoring)
+    except Exception:
+        pass
 
     inv = Invoice(
         invoice_number=norm["invoice_number"],
@@ -113,8 +118,14 @@ def process_invoice(db: Session, filename: str, extraction: dict, forensics: dic
 
     ticket_ids = []
     for c in scoring["contributing_checks"]:
-        t = create_ticket(db, invoice_id=inv.id, exception_type=c["check"],
-                           risk_contribution=c["points"], narrative=c.get("narrative", c["reason"]))
+        t = create_ticket(
+            db,
+            invoice_id=inv.id,
+            exception_type=c["check"],
+            risk_contribution=c["points"],
+            narrative=c.get("narrative", c["reason"]),
+            msme_narrative=c.get("msme_narrative"),
+        )
         ticket_ids.append(t.id)
 
     return {

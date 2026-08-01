@@ -6,6 +6,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="AI-Powered Invoice Risk Scanner")
+from app.db.database import Base, engine
+from app.models.invoice import Invoice
+from app.models.ticket import Ticket
+from app.models.vendor import Vendor
+from app.models.ledger_entry import LedgerEntry
+Base.metadata.create_all(engine)
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,3 +40,6 @@ app.include_router(routes_upload.router, prefix="/upload", tags=["upload"])
 from app.api import routes_tickets, routes_dashboard
 app.include_router(routes_tickets.router, prefix="/tickets", tags=["tickets"])
 app.include_router(routes_dashboard.router, prefix="/dashboard", tags=["dashboard"])
+
+from app.api import routes_frontend_adapter
+app.include_router(routes_frontend_adapter.router, prefix="/api", tags=["frontend-adapter"])

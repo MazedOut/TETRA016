@@ -9,7 +9,7 @@ export const client = axios.create({
 // Set this to false once the FastAPI backend endpoints below exist.
 // Every function tries the real call first when USE_MOCK is false, so this
 // file is the only thing that needs to change when the backend is ready.
-export const USE_MOCK = true;
+export const USE_MOCK = false;
 
 function delay(ms = 250) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -214,6 +214,24 @@ export async function submitVendorCorrection(payload) {
     return { ok: true, ...payload };
   }
   const { data } = await client.post("/vendors/correct", payload);
+  return data;
+}
+
+export async function submitBulkResolve(ticketIds, reason = "Bulk resolved by auditor") {
+  if (USE_MOCK) {
+    await delay();
+    return { ok: true, count: ticketIds.length };
+  }
+  const { data } = await client.post("/tickets/bulk-resolve", { ticketIds, reason });
+  return data;
+}
+
+export async function resetDemoData() {
+  if (USE_MOCK) {
+    await delay();
+    return { ok: true, message: "Mock data reset" };
+  }
+  const { data } = await client.post("/dev/reset");
   return data;
 }
 

@@ -1,4 +1,5 @@
 """Orchestrates: ocr_engine -> field_parser -> confidence_scorer -> gemini_fallback -> math_check."""
+from app.config import CRITICAL_FIELDS
 from .ocr_engine import run_ocr
 from .field_parser import parse_fields
 from .confidence_scorer import score_fields, needs_fallback
@@ -23,8 +24,8 @@ def extract_invoice(filename: str, data: bytes) -> dict:
 
     math_ok, math_reason = check(fields)
 
-    # any field still null after OCR + Gemini fallback = needs human attention
-    needs_review = [f for f, v in fields.items() if v is None]
+    # only critical fields (invoice_number, vendor_name, total_amount) still null after OCR + Gemini fallback = needs human attention
+    needs_review = [f for f in CRITICAL_FIELDS if fields.get(f) is None]
 
     return {
         "fields": fields,
