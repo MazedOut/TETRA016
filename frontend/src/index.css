@@ -1,3 +1,52 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #1B2430;
+}
+
+/* subtle paper grain on card surfaces */
+.paper-surface {
+  background-color: #F6F1E4;
+  background-image: radial-gradient(circle at 1px 1px, rgba(27,36,48,0.05) 1px, transparent 0);
+  background-size: 5px 5px;
+}
+
+/* signature element: a rotated rubber-stamp badge for risk score */
+.stamp-badge {
+  border: 2.5px solid currentColor;
+  border-radius: 9999px;
+  transform: rotate(-4deg);
+  box-shadow: 0 0 0 1.5px currentColor inset;
+  position: relative;
+}
+.stamp-badge::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid currentColor;
+  border-radius: 9999px;
+  opacity: 0.55;
+}
+
+:focus-visible {
+  outline: 2px solid #C8922A;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-thumb { background: #3C4C61; border-radius: 8px; }
+::-webkit-scrollbar-track { background: #232E3D; }
