@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+pandas
+paddleocr
+paddlepaddle
+pytesseract
+google-generativeai
+rapidfuzz
+pikepdf
+pymupdf
+pdf2image
+sqlalchemy
+python-dotenv
+reportlab
+weasyprint
+python-multipart
