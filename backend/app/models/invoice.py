@@ -31,6 +31,7 @@ class Invoice(Base):
     folder = Column(String, nullable=True)                # auto-sorted or user-assigned
     folder_id = Column(Integer, nullable=True)             # linked Folder model ID
     source_file_path = Column(String, nullable=True)
+    edit_history = Column(JSON, nullable=True)              # append-only list: {actor, field, old_value, new_value, timestamp}
 
     record_hash = Column(String, nullable=True)            # SHA-256 seal
 

@@ -164,20 +164,21 @@ export default function Reports() {
 
           {/* Insufficient Data Warnings */}
           {result.insufficient_data_notes?.length > 0 && (
-            <div className="bg-stamp-amber/15 border border-stamp-amber/40 rounded-lg p-5 text-ink space-y-2 shadow-sm">
-              <h4 className="text-xs uppercase tracking-wider font-mono font-bold text-stamp-amber">
-                Historical Evidence Sample Size Notes
+            <div className="bg-paper-dim border-l-4 border-stamp-amber border border-l-stamp-amber rounded-lg p-5 text-ink space-y-2 shadow-sm">
+              <h4 className="text-xs uppercase tracking-wider font-mono font-bold text-stamp-amber flex items-center gap-2">
+                <span>⚠</span> Historical Evidence Sample Size Notes
               </h4>
-              <ul className="space-y-1.5 text-xs font-mono text-ink font-semibold">
+              <ul className="space-y-1.5 text-xs font-mono text-ink font-medium">
                 {result.insufficient_data_notes.map((note, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <span>⚠️</span>
+                    <span className="text-stamp-amber shrink-0">•</span>
                     <span>{note.message}</span>
                   </li>
                 ))}
               </ul>
             </div>
           )}
+
 
           {/* Flagged Invoices Breakdown */}
           {result.flagged_invoices?.length > 0 && (

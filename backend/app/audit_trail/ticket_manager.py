@@ -9,8 +9,15 @@ from .history_log import append_history
 
 VALID_STATUSES = {"open", "in-review", "resolved", "escalated"}
 
-def create_ticket(db: Session, invoice_id: int, exception_type: str,
-                   risk_contribution: int, narrative: str = None, msme_narrative: str = None) -> Ticket:
+def create_ticket(
+    db: Session,
+    invoice_id: int,
+    exception_type: str,
+    risk_contribution: int,
+    narrative: str,
+    msme_narrative: str = None,
+    evidence_data: dict = None,
+) -> Ticket:
     ticket = Ticket(
         invoice_id=invoice_id,
         exception_type=exception_type,
@@ -18,7 +25,11 @@ def create_ticket(db: Session, invoice_id: int, exception_type: str,
         risk_contribution=risk_contribution,
         narrative=narrative,
         msme_narrative=msme_narrative,
-        history=[],
+        evidence_data=evidence_data,
+        history=[{
+            "action": "created",
+            "timestamp": dt.datetime.utcnow().isoformat()
+        }],
         created_at=dt.datetime.utcnow(),
         updated_at=dt.datetime.utcnow(),
     )

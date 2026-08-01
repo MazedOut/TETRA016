@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { fetchFolders, createFolder } from "../api/client.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 /**
  * Auto-sorted invoice folders by vendor/category, with manual folder creation and reassignment.
  */
 export default function FolderView({ onSelectFolder, selectedFolder }) {
+  const navigate = useNavigate();
+  const { canWrite } = useAuth();
   const [folders, setFolders] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -46,12 +50,14 @@ export default function FolderView({ onSelectFolder, selectedFolder }) {
             Auto-classified on ingestion. Click a folder to filter tickets.
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="text-xs font-mono px-3 py-1.5 rounded-md bg-stamp-red text-paper hover:bg-stamp-red/90 font-medium transition-colors"
-        >
-          {showCreate ? "Cancel" : "+ Create Folder"}
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            className="text-xs font-mono px-3 py-1.5 rounded-md bg-stamp-red text-paper hover:bg-stamp-red/90 font-medium transition-colors"
+          >
+            {showCreate ? "Cancel" : "+ Create Folder"}
+          </button>
+        )}
       </div>
 
       {showCreate && (
@@ -108,23 +114,48 @@ export default function FolderView({ onSelectFolder, selectedFolder }) {
         {folders.map((f) => {
           const isSelected = selectedFolder === f.folder;
           return (
-            <div
+          <div
               key={f.folder}
-              onClick={() => onSelectFolder?.(isSelected ? null : f.folder)}
               className={
-                "border rounded-md p-4 cursor-pointer transition-all hover:border-stamp-red/40 " +
+                "border rounded-md p-4 transition-all hover:border-stamp-red/40 " +
                 (isSelected ? "border-stamp-red bg-stamp-red/10 shadow-sm" : "border-ink-600/15 bg-paper")
               }
             >
-              <div className="flex justify-between items-start">
-                <p className="font-medium text-sm text-ink">{f.folder}</p>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-ink/10 text-ink-700">
-                  {f.category}
-                </span>
+              <div
+                className="cursor-pointer"
+                onClick={() => onSelectFolder?.(isSelected ? null : f.folder)}
+              >
+                <div className="flex justify-between items-start">
+                  <p className="font-medium text-sm text-ink">{f.folder}</p>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-ink/10 text-ink-700">
+                    {f.category}
+                  </span>
+                </div>
+                <p className="text-xs text-ink-600 font-mono mt-2">
+                  <span className="font-bold text-ink-800">{f.count}</span> invoice(s)
+                </p>
               </div>
-              <p className="text-xs text-ink-600 font-mono mt-2">
-                <span className="font-bold text-ink-800">{f.count}</span> invoice(s)
-              </p>
+              <div className="mt-3 pt-2.5 border-t border-ink-600/15 flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    if (onSelectFolder) {
+                      onSelectFolder(isSelected ? null : f.folder);
+                    } else {
+                      navigate(`/folders/${encodeURIComponent(f.folder)}`);
+                    }
+                  }}
+                  className="text-[10px] font-mono text-stamp-red hover:underline"
+                >
+                  {isSelected ? "✓ Filtering" : "Filter tickets"}
+                </button>
+                <Link
+                  to={`/folders/${encodeURIComponent(f.folder)}`}
+                  className="text-[10px] font-mono text-paper/60 hover:text-paper transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  View invoices →
+                </Link>
+              </div>
             </div>
           );
         })}

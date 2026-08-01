@@ -33,7 +33,40 @@ export default function Dashboard() {
       </div>
 
       <StatsCards stats={stats} />
-      <RiskChart data={dist} />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <RiskChart data={dist} />
+        </div>
+        <div className="paper-surface rounded-lg p-6 text-ink space-y-6">
+          <div>
+            <h3 className="font-display text-lg font-semibold mb-3">Top Risk Drivers</h3>
+            <ul className="space-y-2">
+              {stats?.topDrivers?.map(d => (
+                <li key={d.type} className="flex justify-between items-center bg-paper border border-ink-600/20 px-3 py-2 rounded">
+                  <span className="font-mono text-xs font-semibold">{d.type}</span>
+                  <span className="bg-stamp-red/10 text-stamp-red font-bold font-mono text-xs px-2 py-0.5 rounded-full">{d.count}</span>
+                </li>
+              ))}
+              {!stats?.topDrivers?.length && <p className="text-xs text-ink-600 italic">No open risk drivers.</p>}
+            </ul>
+          </div>
+          
+          <div>
+            <h3 className="font-display text-lg font-semibold mb-3">Recent Exceptions</h3>
+            <ul className="space-y-3">
+              {stats?.recentExceptions?.map(e => (
+                <li key={e.id} className="border-l-2 border-stamp-red pl-3">
+                  <Link to={`/exceptions`} className="text-xs font-mono font-bold hover:underline text-ink">{e.id}</Link>
+                  <p className="text-[11px] text-ink-700 mt-0.5 leading-tight line-clamp-2">{e.narrative}</p>
+                </li>
+              ))}
+              {!stats?.recentExceptions?.length && <p className="text-xs text-ink-600 italic">No recent exceptions.</p>}
+            </ul>
+          </div>
+        </div>
+      </div>
+
       <FolderView />
     </div>
   );

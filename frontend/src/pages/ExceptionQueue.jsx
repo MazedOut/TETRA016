@@ -4,7 +4,7 @@ import TicketCard from "../components/TicketCard.jsx";
 import RiskConfidenceFilter from "../components/RiskConfidenceFilter.jsx";
 import MergeConfirmModal from "../components/MergeConfirmModal.jsx";
 import FolderView from "../components/FolderView.jsx";
-import { useMode } from "../context/ModeContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const EXCEPTION_LABELS = {
   duplicate_invoice: "Duplicate Invoices",
@@ -21,7 +21,7 @@ const EXCEPTION_LABELS = {
 };
 
 export default function ExceptionQueue() {
-  const { mode } = useMode();
+  const { mode, canWrite } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [filters, setFilters] = useState({});
   const [selected, setSelected] = useState([]);
@@ -205,8 +205,8 @@ export default function ExceptionQueue() {
       {/* Filter Toolbar */}
       <RiskConfidenceFilter onChange={setFilters} />
 
-      {/* Bulk Action Toolbar Banner */}
-      {selected.length > 0 && (
+      {/* Bulk Action Toolbar Banner — Auditor only */}
+      {canWrite && selected.length > 0 && (
         <div className="bg-stamp-amber/15 border border-stamp-amber/40 rounded-lg p-3 text-ink flex items-center justify-between flex-wrap gap-3 text-sm font-mono animate-fadeIn">
           <div className="flex items-center gap-3">
             <input
@@ -238,7 +238,7 @@ export default function ExceptionQueue() {
 
             <button
               onClick={() => setSelected([])}
-              className="text-xs text-ink-600 hover:text-ink px-2 py-1"
+              className="text-xs text-paper/50 hover:text-paper px-2 py-1"
             >
               Deselect All
             </button>
@@ -256,16 +256,16 @@ export default function ExceptionQueue() {
               {groupBy !== "flat" && (
                 <div
                   onClick={() => toggleCollapse(group.key)}
-                  className="flex items-center justify-between cursor-pointer py-2.5 px-3.5 bg-paper-surface rounded-md border border-ink-600/20 hover:border-ink-600/40 text-ink transition-colors shadow-sm"
+                  className="flex items-center justify-between cursor-pointer py-2.5 px-3.5 bg-ink-800 rounded-md border border-ink-600/40 hover:border-ink-600 transition-colors shadow-sm"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-ink-600 font-bold">{isCollapsed ? "▶" : "▼"}</span>
-                    <h3 className="font-display font-semibold text-base">{group.label}</h3>
-                    <span className="stamp-badge text-[11px] font-mono px-2 py-0.5 rounded-full bg-stamp-red/10 text-stamp-red font-bold">
+                    <span className="text-xs font-mono text-paper/60 font-bold">{isCollapsed ? "▶" : "▼"}</span>
+                    <h3 className="font-display font-semibold text-base text-paper">{group.label}</h3>
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-stamp-red/20 text-stamp-red font-bold border border-stamp-red/30">
                       {group.items.length} {group.items.length === 1 ? "ticket" : "tickets"}
                     </span>
                   </div>
-                  <span className="text-xs font-mono text-ink-600">
+                  <span className="text-xs font-mono text-paper/50">
                     {isCollapsed ? "click to expand" : "click to collapse"}
                   </span>
                 </div>
@@ -279,7 +279,7 @@ export default function ExceptionQueue() {
                       key={t.id}
                       ticket={t}
                       selected={selected.includes(t.id)}
-                      onToggleSelect={toggleSelect}
+                      onToggleSelect={canWrite ? toggleSelect : undefined}
                     />
                   ))}
                 </div>

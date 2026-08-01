@@ -6,13 +6,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="AI-Powered Invoice Risk Scanner")
-from app.db.database import Base, engine
+from app.db.database import Base, engine, auto_migrate
 from app.models.invoice import Invoice
 from app.models.ticket import Ticket
 from app.models.vendor import Vendor
 from app.models.ledger_entry import LedgerEntry
 from app.models.folder import Folder
 Base.metadata.create_all(engine)
+auto_migrate()   # Part A: add any columns the models gained since last startup
+
 
 
 app.add_middleware(

@@ -143,10 +143,26 @@ export default function UploadBatch() {
               {results.map((r) => (
                 <div key={r.filename} className="flex items-center justify-between border-b border-ink-600/10 pb-3">
                   <div>
-                    <p className="font-mono text-sm font-medium">{r.filename}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-mono text-sm font-medium">{r.filename}</p>
+                      {r.risk_level && (
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase ${
+                          r.risk_level === 'high' ? 'bg-stamp-red/10 text-stamp-red' : 
+                          r.risk_level === 'medium' ? 'bg-stamp-amber/10 text-stamp-amber' : 
+                          'bg-stamp-green/10 text-stamp-green'
+                        }`}>
+                          {r.risk_level} RISK
+                        </span>
+                      )}
+                    </div>
                     <p className={"text-xs font-mono mt-0.5 " + (r.status === "accepted" ? "text-stamp-green" : "text-stamp-amber")}>
                       {r.status === "accepted" ? "✓ Accepted & scored cleanly" : "⚠ Flagged for review"}
                     </p>
+                    {r.invoice_id && (
+                      <Link to={`/invoices/${r.invoice_id}`} className="text-[11px] font-mono text-ink-600 hover:text-ink underline mt-1 inline-block">
+                        View in workspace &rarr;
+                      </Link>
+                    )}
                   </div>
                   {r.status === "needs-review" && !r.decision && (
                     <div className="flex gap-2">

@@ -1,20 +1,7 @@
-import { createContext, useContext, useState } from "react";
-
-const ModeContext = createContext({
-  mode: "auditor", // "auditor" | "msme"
-  setMode: () => {},
-});
-
-export function ModeProvider({ children }) {
-  const [mode, setMode] = useState("auditor");
-
-  return (
-    <ModeContext.Provider value={{ mode, setMode }}>
-      {children}
-    </ModeContext.Provider>
-  );
-}
-
-export function useMode() {
-  return useContext(ModeContext);
-}
+/**
+ * Backward-compatibility shim.
+ * All auth logic now lives in AuthContext. This file re-exports the hook so
+ * components that still import from here don't need changes.
+ */
+export { useMode, AuthProvider as ModeProvider } from "./AuthContext.jsx";
+export { useAuth } from "./AuthContext.jsx";

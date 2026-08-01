@@ -1,12 +1,15 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
-import { useState } from "react";
 import Dashboard from "./pages/Dashboard.jsx";
 import ExceptionQueue from "./pages/ExceptionQueue.jsx";
 import InvoiceDetail from "./pages/InvoiceDetail.jsx";
 import UploadBatch from "./pages/UploadBatch.jsx";
 import Reports from "./pages/Reports.jsx";
-import { ModeProvider, useMode } from "./context/ModeContext.jsx";
+import FolderDetail from "./pages/FolderDetail.jsx";
+import DuplicateComparison from "./pages/DuplicateComparison.jsx";
+import LoginPage from "./pages/LoginPage.jsx";
+import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { resetDemoData } from "./api/client.js";
+import { useState } from "react";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", end: true },
@@ -15,8 +18,19 @@ const NAV_ITEMS = [
   { to: "/reports", label: "Reports" },
 ];
 
+const ROLE_STYLES = {
+  auditor: {
+    badge: "bg-stamp-red/15 border-stamp-red/40 text-stamp-red",
+    icon: "🔍",
+  },
+  msme: {
+    badge: "bg-stamp-green/15 border-stamp-green/40 text-stamp-green",
+    icon: "📄",
+  },
+};
+
 function Shell({ children }) {
-  const { mode, setMode } = useMode();
+  const { role, logout, canWrite } = useAuth();
   const [resetting, setResetting] = useState(false);
   const [resetMsg, setResetMsg] = useState("");
 
@@ -30,12 +44,14 @@ function Shell({ children }) {
         setResetMsg("");
         window.location.reload();
       }, 800);
-    } catch (e) {
+    } catch {
       setResetMsg("Reset failed");
     } finally {
       setResetting(false);
     }
   }
+
+  const roleStyle = ROLE_STYLES[role] ?? ROLE_STYLES.auditor;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -46,8 +62,12 @@ function Shell({ children }) {
               IRS
             </div>
             <div>
-              <h1 className="font-display text-lg font-semibold leading-none">Invoice Risk Scanner</h1>
-              <p className="text-[11px] text-ink-600 font-mono tracking-wide">rule &rarr; cache &rarr; AI</p>
+              <h1 className="font-display text-lg font-semibold leading-none text-paper">
+                Invoice Risk Scanner
+              </h1>
+              <p className="text-[11px] text-ink-600 font-mono tracking-wide">
+                rule &rarr; cache &rarr; AI
+              </p>
             </div>
           </div>
 
@@ -59,7 +79,9 @@ function Shell({ children }) {
                 end={item.end}
                 className={({ isActive }) =>
                   "px-3 py-1.5 text-sm rounded-md font-medium transition-colors " +
-                  (isActive ? "bg-paper text-ink" : "text-paper/70 hover:text-paper hover:bg-ink-700")
+                  (isActive
+                    ? "bg-paper text-ink"
+                    : "text-paper/70 hover:text-paper hover:bg-ink-700")
                 }
               >
                 {item.label}
@@ -68,27 +90,32 @@ function Shell({ children }) {
           </nav>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleReset}
-              disabled={resetting}
-              className="text-xs font-mono px-2.5 py-1 rounded bg-ink-700 hover:bg-stamp-red/20 text-paper/80 hover:text-stamp-red border border-ink-600 transition-colors"
-              title="Dev Tool: Wipe Invoice and Ticket tables"
-            >
-              {resetMsg || (resetting ? "Resetting..." : "Reset demo data")}
-            </button>
-
-            <div className="flex items-center gap-2 bg-ink-700 rounded-full p-1 text-xs font-mono">
+            {/* Dev reset — auditor only */}
+            {canWrite && (
               <button
-                onClick={() => setMode("auditor")}
-                className={"px-3 py-1 rounded-full transition-colors " + (mode === "auditor" ? "bg-paper text-ink" : "text-paper/60")}
+                onClick={handleReset}
+                disabled={resetting}
+                className="text-xs font-mono px-2.5 py-1 rounded bg-ink-700 hover:bg-stamp-red/20 text-paper/80 hover:text-stamp-red border border-ink-600 transition-colors"
+                title="Dev Tool: Wipe Invoice and Ticket tables"
               >
-                Auditor
+                {resetMsg || (resetting ? "Resetting..." : "Reset demo data")}
               </button>
-              <button
-                onClick={() => setMode("msme")}
-                className={"px-3 py-1 rounded-full transition-colors " + (mode === "msme" ? "bg-paper text-ink" : "text-paper/60")}
+            )}
+
+            {/* Role badge + switch */}
+            <div className="flex items-center gap-2">
+              <span
+                className={`flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-full border font-semibold ${roleStyle.badge}`}
               >
-                MSME
+                <span>{roleStyle.icon}</span>
+                {role === "auditor" ? "Auditor" : "MSME"}
+              </span>
+              <button
+                onClick={logout}
+                className="text-xs font-mono text-paper/50 hover:text-paper/80 transition-colors px-2 py-1 rounded hover:bg-ink-700"
+                title="Switch role"
+              >
+                Switch ↩
               </button>
             </div>
           </div>
@@ -99,27 +126,42 @@ function Shell({ children }) {
 
       <footer className="border-t border-ink-600 py-4">
         <p className="max-w-6xl mx-auto px-6 text-[11px] font-mono text-ink-600">
-          Every place the model could be wrong, there's a form, not an assumption.
+          Every place the model could be wrong, there&apos;s a form, not an assumption.
+          {!canWrite && (
+            <span className="ml-3 text-stamp-green/70">
+              MSME view — read-only
+            </span>
+          )}
         </p>
       </footer>
     </div>
   );
 }
 
+function AppRoutes() {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <LoginPage />;
+  return (
+    <Shell>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/exceptions" element={<ExceptionQueue />} />
+        <Route path="/invoices/:id" element={<InvoiceDetail />} />
+        <Route path="/upload" element={<UploadBatch />} />
+        <Route path="/reports" element={<Reports />} />
+        <Route path="/folders/:folderName" element={<FolderDetail />} />
+        <Route path="/invoices/:id/compare/:targetId" element={<DuplicateComparison />} />
+      </Routes>
+    </Shell>
+  );
+}
+
 export default function App() {
   return (
-    <ModeProvider>
+    <AuthProvider>
       <BrowserRouter>
-        <Shell>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/exceptions" element={<ExceptionQueue />} />
-            <Route path="/invoices/:id" element={<InvoiceDetail />} />
-            <Route path="/upload" element={<UploadBatch />} />
-            <Route path="/reports" element={<Reports />} />
-          </Routes>
-        </Shell>
+        <AppRoutes />
       </BrowserRouter>
-    </ModeProvider>
+    </AuthProvider>
   );
 }

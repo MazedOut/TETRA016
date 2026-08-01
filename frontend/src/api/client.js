@@ -1,9 +1,24 @@
 import axios from "axios";
 
+// ---------------------------------------------------------------------------
+// Role header — set by AuthContext after login so every request carries
+// X-Role: auditor|msme. Backend write endpoints read this header.
+// ---------------------------------------------------------------------------
+let _currentRole = null;
+
+export function setClientRole(role) {
+  _currentRole = role;
+}
+
 // Real axios instance, proxied to the FastAPI backend via vite.config.js's
 // /api proxy. Import { client } for any raw calls you need to make directly.
 export const client = axios.create({
   baseURL: "/api",
+});
+
+client.interceptors.request.use((config) => {
+  if (_currentRole) config.headers["X-Role"] = _currentRole;
+  return config;
 });
 
 // Set this to false once the FastAPI backend endpoints below exist.
@@ -254,5 +269,15 @@ export async function moveInvoiceToFolder(invoiceId, folder) {
   return data;
 }
 
+export async function patchInvoice(invoiceId, fields) {
+  const numericId = String(invoiceId).replace(/^INV-/, "");
+  const { data } = await client.patch(`/invoices/${numericId}`, fields);
+  return data;
+}
+
+export async function fetchFolderInvoices(folderName) {
+  const { data } = await client.get(`/folders/${encodeURIComponent(folderName)}/invoices`);
+  return data;
+}
 
 export default client;

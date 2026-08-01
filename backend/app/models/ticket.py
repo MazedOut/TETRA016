@@ -18,5 +18,6 @@ class Ticket(Base):
     merged_into_ticket_id = Column(Integer, nullable=True)
     merge_reason = Column(String, nullable=True)
     history = Column(JSON, nullable=True)                      # append-only action log
+    evidence_data = Column(JSON, nullable=True)                # arbitrary data for UI (e.g. duplicate target)
     created_at = Column(DateTime)
     updated_at = Column(DateTime)

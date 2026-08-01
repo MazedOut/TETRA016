@@ -54,55 +54,74 @@ export default function TicketCard({ ticket, selected, onToggleSelect }) {
     : ticket.aiNarrative;
 
   return (
-    <div className="paper-surface rounded-lg p-4 text-ink flex items-start gap-4 hover:border-ink-600/40 transition-all">
-      {onToggleSelect && (
-        <input
-          type="checkbox"
-          checked={!!selected}
-          onChange={() => onToggleSelect(ticket.id)}
-          aria-label={`Select ${ticket.id}`}
-          className="mt-2 rounded border-ink-600/30 text-stamp-red focus:ring-stamp-red cursor-pointer"
-        />
-      )}
-
-      <div
-        className={`stamp-badge w-14 h-14 shrink-0 flex flex-col items-center justify-center font-mono font-semibold text-[10px] ${text}`}
-      >
-        <span className="text-base leading-none font-display font-bold">{ticket.riskScore}</span>
-        <span className="mt-0.5 opacity-80">{label}</span>
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Link to={`/invoices/${ticket.invoiceId}`} className="font-mono text-sm font-semibold text-stamp-red hover:underline">
-            {ticket.id}
-          </Link>
-          <span className="text-xs text-ink-600 font-mono px-1.5 py-0.5 rounded bg-ink/5">{ticket.invoiceId}</span>
-          <span className="text-xs font-mono text-ink-600 font-semibold">₹{ticket.amount}</span>
-        </div>
-        
-        <p className="text-sm font-medium mt-0.5">{ticket.vendor}</p>
-        <p className="text-xs font-mono font-semibold text-ink-600 mt-1">{displayFlag}</p>
-
-        {displayNarrative && (
-          <p className={"text-xs mt-1.5 p-2 rounded border font-sans leading-relaxed " + (mode === "msme" ? "bg-stamp-amber/10 border-stamp-amber/30 text-ink" : "bg-ink/5 border-ink-600/10 text-ink-700")}>
-            <span className="font-semibold text-[10px] uppercase font-mono tracking-wider block mb-0.5 text-ink-600">
-              {mode === "msme" ? "💡 Plain-Language Advice" : "🤖 Technical AI Narrative"}
-            </span>
-            {displayNarrative}
-          </p>
+    <div className="paper-surface rounded-lg p-4 text-ink flex flex-col items-start gap-4 hover:border-ink-600/40 transition-all">
+      <div className="flex items-start gap-4 w-full">
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={() => onToggleSelect(ticket.id)}
+            aria-label={`Select ${ticket.id}`}
+            className="mt-2 rounded border-ink-600/30 text-stamp-red focus:ring-stamp-red cursor-pointer"
+          />
         )}
-      </div>
 
-      <div className="flex flex-col items-end gap-2 shrink-0">
-        <div className={`px-2 py-1 rounded border text-right font-mono ${confStyle}`}>
-          <p className="text-[10px] uppercase tracking-wider opacity-70">confidence</p>
-          <p className="text-sm font-bold leading-none">{ticket.confidenceScore}%</p>
+        <div
+          className={`stamp-badge w-14 h-14 shrink-0 flex flex-col items-center justify-center font-mono font-semibold text-[10px] ${text}`}
+        >
+          <span className="text-base leading-none font-display font-bold">{ticket.riskScore}</span>
+          <span className="mt-0.5 opacity-80">{label}</span>
         </div>
 
-        <span className={`text-xs font-mono px-2 py-1 rounded-full ${STATUS_STYLES[ticket.status]}`}>
-          {STATUS_LABELS[ticket.status]}
-        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link to={`/invoices/${ticket.invoiceId}`} className="font-mono text-sm font-semibold text-stamp-red hover:underline">
+              {ticket.id}
+            </Link>
+            <span className="text-xs text-ink-600 font-mono px-1.5 py-0.5 rounded bg-ink/5">{ticket.invoiceId}</span>
+            <span className="text-xs font-mono text-ink-600 font-semibold">₹{ticket.amount}</span>
+          </div>
+          
+          <p className="text-sm font-medium mt-0.5">{ticket.vendor}</p>
+          <p className="text-xs font-mono font-semibold text-ink-600 mt-1">{displayFlag}</p>
+
+          {displayNarrative && (
+            <p className={"text-xs mt-1.5 p-2 rounded border font-sans leading-relaxed " + (mode === "msme" ? "bg-stamp-amber/10 border-stamp-amber/30 text-ink" : "bg-ink/5 border-ink-600/10 text-ink-700")}>
+              <span className="font-semibold text-[10px] uppercase font-mono tracking-wider block mb-0.5 text-ink-600">
+                {mode === "msme" ? "💡 Plain-Language Advice" : "🤖 Technical AI Narrative"}
+              </span>
+              {displayNarrative}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className={`px-2 py-1 rounded border text-right font-mono ${confStyle}`}>
+            <p className="text-[10px] uppercase tracking-wider opacity-70">confidence</p>
+            <p className="text-sm font-bold leading-none">{ticket.confidenceScore}%</p>
+          </div>
+
+          <span className={`text-xs font-mono px-2 py-1 rounded-full ${STATUS_STYLES[ticket.status]}`}>
+            {STATUS_LABELS[ticket.status]}
+          </span>
+        </div>
+      </div>
+
+      <div className="w-full flex gap-2 mt-4 ml-4">
+        <Link
+          to={`/invoices/${ticket.invoiceId}`}
+          className="text-xs font-medium px-4 py-2 rounded-md border border-ink-600/30 text-ink hover:bg-ink-600/10 transition-colors"
+        >
+          View full invoice &rarr;
+        </Link>
+        {ticket.evidenceData?.duplicate_invoice_id && (
+          <Link
+            to={`/invoices/${ticket.invoiceId}/compare/${ticket.evidenceData.duplicate_invoice_id}`}
+            className="text-xs font-medium px-4 py-2 rounded-md border border-stamp-amber/40 text-stamp-amber bg-stamp-amber/5 hover:bg-stamp-amber/10 transition-colors"
+          >
+            Compare side-by-side &rarr;
+          </Link>
+        )}
       </div>
     </div>
   );

@@ -141,6 +141,7 @@ def process_invoice(
     # duplicate check against everything already saved in the DB
     existing = db.query(Invoice).all()
     existing_dicts = [{
+        "id": e.id,
         "invoice_number": e.invoice_number, "vendor_gstin": e.vendor_gstin,
         "total_amount": e.total_amount, "invoice_date": e.invoice_date,
     } for e in existing]
@@ -149,7 +150,11 @@ def process_invoice(
     my_index = len(all_invoices) - 1
     for d in dup_flags:
         if d["invoice_index"] == my_index:
-            flags.append({"check": "duplicate_invoice", "reason": d["reason"]})
+            flags.append({
+                "check": "duplicate_invoice", 
+                "reason": d["reason"],
+                "duplicate_of_id": d.get("duplicate_of_id")
+            })
 
     # vendor_matcher check
     vm_df = vendor_master_df if vendor_master_df is not None else _get_vendor_master_df(db)
@@ -227,6 +232,10 @@ def process_invoice(
 
     ticket_ids = []
     for c in scoring["contributing_checks"]:
+        evidence = {}
+        if c.get("duplicate_of_id"):
+            evidence["duplicate_invoice_id"] = c["duplicate_of_id"]
+            
         t = create_ticket(
             db,
             invoice_id=inv.id,
@@ -234,6 +243,7 @@ def process_invoice(
             risk_contribution=c["points"],
             narrative=c.get("narrative", c["reason"]),
             msme_narrative=c.get("msme_narrative"),
+            evidence_data=evidence if evidence else None
         )
         ticket_ids.append(t.id)
 

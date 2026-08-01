@@ -1,6 +1,6 @@
 """Adapter layer: exposes exactly what frontend/src/api/client.js expects,
 translating our real DB shapes underneath. Mounted at /api."""
-from fastapi import APIRouter, UploadFile, File, Depends
+from fastapi import APIRouter, UploadFile, File, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.db.database import get_db
@@ -11,6 +11,7 @@ from app.models.folder import Folder
 from app.audit_trail.ticket_manager import update_status, mark_false_positive, merge_tickets
 from app.ingestion.batch_handler import process_batch
 from app.orchestrator import process_invoice
+import datetime as dt
 
 router = APIRouter()
 
@@ -55,6 +56,21 @@ from app.scoring.itc_calculator import calculate_itc_at_risk
 from app.scoring.msme_penalty import calculate_batch_penalties
 from app.db.seed import seed
 
+
+def _require_auditor(request: Request):
+    """FastAPI dependency — raises 403 if the caller is not the auditor role.
+
+    Reads X-Role header set by the frontend axios interceptor on every request.
+    SECURITY NOTE: This is demo-grade protection, not cryptographic auth.
+    A caller who sets X-Role: auditor themselves will bypass this check.
+    """
+    role = request.headers.get("X-Role", "")
+    if role != "auditor":
+        raise HTTPException(
+            status_code=403,
+            detail="Auditor role required. Set X-Role: auditor header.",
+        )
+
 @router.get("/stats")
 def stats(db: Session = Depends(get_db)):
     invoices = db.query(Invoice).all()
@@ -78,6 +94,22 @@ def stats(db: Session = Depends(get_db)):
     gemini_count = sum(1 for inv in invoices if getattr(inv, "ocr_source", None) == "gemini")
     avoided_count = total - gemini_count
 
+    # Top Risk Drivers
+    tickets = db.query(Ticket).all()
+    driver_counts = {}
+    for t in tickets:
+        if t.status != "resolved":
+            driver_counts[t.exception_type] = driver_counts.get(t.exception_type, 0) + 1
+    top_drivers = [{"type": k, "count": v} for k, v in sorted(driver_counts.items(), key=lambda x: x[1], reverse=True)[:5]]
+
+    # Recent Exceptions
+    recent_exceptions = [{
+        "id": f"TCK-{t.id}",
+        "type": t.exception_type,
+        "narrative": t.narrative,
+        "created_at": t.created_at.isoformat() if t.created_at else None
+    } for t in sorted(tickets, key=lambda x: x.created_at or dt.datetime.min, reverse=True)[:5]]
+
     return {
         "itcAtRiskInr": itc_res["itc_at_risk"],
         "invoicesProcessed": total,
@@ -86,6 +118,8 @@ def stats(db: Session = Depends(get_db)):
         "msmePenaltyExposureInr": msme_res["total_estimated_penalty"],
         "aiFallbackCount": gemini_count,
         "aiCallsAvoided": max(0, avoided_count),
+        "topDrivers": top_drivers,
+        "recentExceptions": recent_exceptions,
     }
 
 
@@ -140,7 +174,7 @@ def get_folders(db: Session = Depends(get_db)):
 
 
 @router.post("/folders")
-def create_folder(payload: dict, db: Session = Depends(get_db)):
+def create_folder(payload: dict, db: Session = Depends(get_db), _: None = Depends(_require_auditor)):
     name = payload.get("name")
     category = payload.get("category", "General")
     if not name:
@@ -158,7 +192,7 @@ def create_folder(payload: dict, db: Session = Depends(get_db)):
 
 
 @router.post("/invoices/{invoice_id}/move")
-def move_invoice_folder(invoice_id: str, payload: dict, db: Session = Depends(get_db)):
+def move_invoice_folder(invoice_id: str, payload: dict, db: Session = Depends(get_db), _: None = Depends(_require_auditor)):
     real_id = int(invoice_id.replace("INV-", ""))
     inv = db.query(Invoice).filter(Invoice.id == real_id).first()
     if not inv:
@@ -219,7 +253,7 @@ def ticket_detail(ticket_id: str, db: Session = Depends(get_db)):
     return _ticket_to_frontend_shape(t, inv) if t else {}
 
 @router.post("/tickets/{ticket_id}/resolve")
-def resolve_ticket(ticket_id: str, payload: dict, db: Session = Depends(get_db)):
+def resolve_ticket(ticket_id: str, payload: dict, db: Session = Depends(get_db), _: None = Depends(_require_auditor)):
     real_id = int(ticket_id.replace("TCK-", ""))
     actor = payload.get("actor", "auditor")
     reason = payload.get("reason", "")
@@ -230,7 +264,7 @@ def resolve_ticket(ticket_id: str, payload: dict, db: Session = Depends(get_db))
     return {"ok": True, "ticketId": ticket_id, "status": t.status}
 
 @router.post("/tickets/bulk-resolve")
-def bulk_resolve_tickets(payload: dict, db: Session = Depends(get_db)):
+def bulk_resolve_tickets(payload: dict, db: Session = Depends(get_db), _: None = Depends(_require_auditor)):
     ticket_ids = payload.get("ticketIds", [])
     reason = payload.get("reason", "Bulk resolved by auditor")
     actor = payload.get("actor", "auditor")
@@ -266,26 +300,41 @@ def invoice_detail(invoice_id: str, db: Session = Depends(get_db)):
 
     file_url = f"/api/invoices/{invoice_id}/file" if inv.source_file_path else None
 
+    from app.scoring.msme_penalty import check_msme_penalty
+    msme_penalty_res = check_msme_penalty(
+        {"invoice_date": inv.invoice_date, "total_amount": inv.total_amount}, 
+        is_paid=False
+    )
+
     return {
         "id": invoice_id,
         "fileUrl": file_url,
         "vendor": inv.vendor_name,
         "gstin": inv.vendor_gstin,
         "folder": inv.folder,
+        "riskScore": inv.risk_score or 0,
+        "riskLevel": inv.risk_level or "low",
         "invoiceDate": inv.invoice_date.isoformat()[:10] if inv.invoice_date else None,
         "extractionConfidence": inv.confidence_score,
         "fields": [
-            {"label": k.replace("_", " ").title(), "value": v, "confidence": conf.get(k, 0)}
+            {"label": k.replace("_", " ").title(), "key": k, "value": v, "confidence": conf.get(k, 0)}
             for k, v in fields.items()
         ],
         "flags": [
             {
                 "type": t.exception_type,
                 "detail": t.narrative,
+                "status": t.status,
                 "msmeNarrative": getattr(t, "msme_narrative", None) or get_msme_fallback(t.exception_type, t.narrative),
+                "evidenceData": getattr(t, "evidence_data", None)
             }
             for t in tickets
         ],
+        "editHistory": inv.edit_history or [],
+        "financialExposure": {
+            "itcAtRisk": (float(inv.cgst or 0) + float(inv.sgst or 0) + float(inv.igst or 0)) if inv.risk_level == "high" else 0,
+            "msmePenalty": msme_penalty_res.get("penalty_amount", 0) if "msme_penalty_res" in locals() else 0
+        }
     }
 
 @router.post("/invoices/upload")
@@ -312,6 +361,8 @@ async def upload_invoices(files: list[UploadFile] = File(...), db: Session = Dep
         out.append({
             "filename": f_name,
             "status": "needs-review" if needs_review else "accepted",
+            "invoice_id": risk.get("invoice_id"),
+            "risk_level": risk.get("risk_level")
         })
     for item in result["rejected"]:
         out.append({"filename": item["filename"], "status": "rejected"})
@@ -321,4 +372,64 @@ async def upload_invoices(files: list[UploadFile] = File(...), db: Session = Dep
 def reset_database(db: Session = Depends(get_db)):
     seed()
     return {"ok": True, "message": "Demo dataset reloaded successfully (60 invoices seeded)."}
+
+
+@router.patch("/invoices/{invoice_id}")
+def patch_invoice(invoice_id: str, payload: dict, request: Request, db: Session = Depends(get_db), _: None = Depends(_require_auditor)):
+    """Auditor-only: correct extracted fields and log each change to edit_history."""
+    real_id = int(str(invoice_id).replace("INV-", ""))
+    inv = db.query(Invoice).filter(Invoice.id == real_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    actor = request.headers.get("X-Actor", "auditor")
+    raw = inv.extracted_raw or {}
+    conf = inv.field_confidence or {}
+    history = list(inv.edit_history or [])
+    changed = []
+
+    for field_key, new_value in payload.items():
+        if field_key.startswith("_"):
+            continue  # skip meta fields
+        old_value = raw.get(field_key)
+        if str(old_value) != str(new_value):
+            history.append({
+                "actor": actor,
+                "field": field_key,
+                "old_value": old_value,
+                "new_value": new_value,
+                "timestamp": dt.datetime.utcnow().isoformat(),
+            })
+            raw[field_key] = new_value
+            changed.append(field_key)
+
+    inv.extracted_raw = raw
+    inv.field_confidence = conf
+    inv.edit_history = history
+    db.commit()
+    return {"ok": True, "invoiceId": invoice_id, "changed": changed, "editHistory": history}
+
+
+@router.get("/folders/{folder_name}/invoices")
+def folder_invoices(folder_name: str, db: Session = Depends(get_db)):
+    """List invoices belonging to a named folder (vendor/category bucket)."""
+    invs = db.query(Invoice).filter(Invoice.folder == folder_name).all()
+    result = []
+    for inv in invs:
+        open_count = db.query(func.count(Ticket.id)).filter(
+            Ticket.invoice_id == inv.id,
+            Ticket.status == "open"
+        ).scalar() or 0
+        result.append({
+            "id": f"INV-{inv.id}",
+            "invoiceNumber": inv.invoice_number or f"INV-{inv.id}",
+            "vendor": inv.vendor_name or "Unknown",
+            "amount": f"{inv.total_amount:.2f}" if inv.total_amount else "0.00",
+            "date": inv.invoice_date.isoformat()[:10] if inv.invoice_date else None,
+            "riskScore": inv.risk_score or 0,
+            "riskLevel": inv.risk_level or "low",
+            "openTickets": open_count,
+        })
+    result.sort(key=lambda x: x["riskScore"], reverse=True)
+    return result
 

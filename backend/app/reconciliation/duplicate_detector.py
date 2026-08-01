@@ -26,17 +26,19 @@ def _hash_key(invoice: dict) -> str:
 
 def hash_tier_duplicates(invoices: list[dict]) -> list[dict]:
     """Exact-match duplicate detection via normalized-key hashing.
-    Returns a list of flag dicts: {invoice_index, duplicate_of_index, method}."""
+    Returns a list of flag dicts: {invoice_index, duplicate_of_index, duplicate_of_id, method}."""
     seen = {}  # hash -> first index seen
     flags = []
     for idx, inv in enumerate(invoices):
         h = _hash_key(inv)
         if h in seen:
+            orig_idx = seen[h]
             flags.append({
                 "invoice_index": idx,
-                "duplicate_of_index": seen[h],
+                "duplicate_of_index": orig_idx,
+                "duplicate_of_id": invoices[orig_idx].get("id"),
                 "method": "hash_exact",
-                "reason": f"Exact duplicate of invoice at index {seen[h]} "
+                "reason": f"Exact duplicate of invoice at index {orig_idx} "
                           f"(same invoice number, vendor GSTIN, amount, and date).",
             })
         else:
@@ -74,9 +76,10 @@ def fuzzy_tier_duplicates(invoices: list[dict], already_flagged_indices: set[int
                 flags.append({
                     "invoice_index": j,
                     "duplicate_of_index": i,
+                    "duplicate_of_id": inv_a.get("id"),
                     "method": "fuzzy_near_duplicate",
                     "similarity_score": similarity,
-                    "reason": f"Invoice number '{inv_b.get('invoice_number')}' is {similarity}% similar "
+                    "reason": f"Invoice number '{inv_b.get('invoice_number')}' is {similarity:.1f}% similar "
                               f"to '{inv_a.get('invoice_number')}' from the same vendor at the same amount "
                               f"— possible altered/typo'd duplicate.",
                 })

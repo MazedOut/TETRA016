@@ -91,13 +91,25 @@ DEMO_INVOICES = [
     {"filename": "INV-9999_MULTI.pdf", "invoice_number": "INV-9999", "vendor_name": "Apex Cybertech", "vendor_gstin": "99BADGSTIN9999Z9", "invoice_date": "15-07-2026", "taxable_value": 90000.00, "cgst": 0.0, "sgst": 0.0, "igst": 16200.00, "total_amount": 106200.00, "tamper_metadata": True},
 ]
 
-# Generate additional clean invoices (INV-2001 to INV-2035) with valid GSTINs and correct state tax rules
+# Generate additional clean invoices to hit 70 total (14 base + 56 clean)
+# We need 12+ invoices for Patel Logistics and Sharma Traders to trigger Benford/volume checks
 CLEAN_VENDORS = list(VALID_GSTIN_MAP.items())
 
+# Create a weighted list so Patel and Sharma get picked more often
+weighted_vendors = []
+for v_name, v_gstin in CLEAN_VENDORS:
+    if v_name in ["Patel Logistics", "Sharma Traders"]:
+        weighted_vendors.extend([(v_name, v_gstin)] * 8)
+    else:
+        weighted_vendors.append((v_name, v_gstin))
+
+import random
+random.seed(2026) # Deterministic generation
+
 start_id = 2001
-for i in range(35):
+for i in range(56):
     inv_num = f"INV-{start_id + i}"
-    v_name, v_gstin = CLEAN_VENDORS[i % len(CLEAN_VENDORS)]
+    v_name, v_gstin = weighted_vendors[i % len(weighted_vendors)]
     taxable = float(10000 + (i * 1250) % 45000)
     is_intra = v_gstin[:2] == HOME_STATE
     if is_intra:
