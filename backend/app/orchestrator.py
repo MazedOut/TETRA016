@@ -12,7 +12,9 @@ from app.scoring.risk_scorer import score_invoice
 from app.ai_layer.narrative_generator import generate_narratives
 from app.ai_layer.msme_translator import translate_for_msme
 from app.audit_trail.ticket_manager import create_ticket
-from app.audit_trail.hash_sealer import seal
+from app.audit_trail.hash_sealer import seal, generate_signature, build_seal_record
+from app.audit_trail.history_log import build_pipeline_event
+from app.reconciliation.forensics import build_forensic_report
 from app.models.invoice import Invoice
 from app.models.vendor import Vendor
 from app.models.ledger_entry import LedgerEntry
@@ -213,6 +215,40 @@ def process_invoice(
     db.commit()
     db.refresh(inv)
 
+    # Build pipeline log for audit trail
+    pipeline_events = [
+        build_pipeline_event("ingestion", f"File '{filename}' ingested"),
+        build_pipeline_event("extraction", f"{len(extraction.get('fields', {}))} fields extracted (confidence: {extraction.get('avg_conf', 0):.0f}%)"),
+        build_pipeline_event("classification", f"Auto-classified to folder: {sort_res.get('folder', 'extra')}"),
+    ]
+    
+    # Log validation results  
+    for flag in flags:
+        check_type = flag.get("check", "unknown")
+        if check_type == "invalid_gstin":
+            pipeline_events.append(build_pipeline_event("gstin_validation_failed", flag.get("reason", "")))
+        elif check_type == "pdf_metadata_tamper":
+            pipeline_events.append(build_pipeline_event("metadata_tamper_detected", flag.get("reason", "")))
+        elif check_type == "invisible_text_detected":
+            pipeline_events.append(build_pipeline_event("invisible_text_detected", flag.get("reason", "")))
+        elif check_type == "duplicate_invoice":
+            pipeline_events.append(build_pipeline_event("duplicate_detected", flag.get("reason", "")))
+        else:
+            pipeline_events.append(build_pipeline_event(check_type, flag.get("reason", "")))
+    
+    if not any(f.get("check") == "invalid_gstin" for f in flags):
+        pipeline_events.append(build_pipeline_event("gstin_validation", "GSTIN validation passed"))
+    
+    pipeline_events.append(build_pipeline_event("metadata_scan", "PDF forensic metadata scan completed"))
+    pipeline_events.append(build_pipeline_event("risk_scoring", f"Risk score: {scoring['risk_score']} ({scoring['risk_level']})"))
+    
+    if scoring.get("contributing_checks"):
+        for c in scoring["contributing_checks"]:
+            if c.get("narrative") and c["narrative"] != c.get("reason"):
+                pipeline_events.append(build_pipeline_event("ai_narrative", f"Narrative generated for {c['check']}"))
+            if c.get("msme_narrative"):
+                pipeline_events.append(build_pipeline_event("ai_msme_translation", f"MSME translation for {c['check']}"))
+
     if file_bytes:
         uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads", str(inv.id))
         os.makedirs(uploads_dir, exist_ok=True)
@@ -223,11 +259,23 @@ def process_invoice(
         inv.source_file_path = rel_path
         db.commit()
 
-    inv.record_hash = seal({
-        "invoice_number": inv.invoice_number,
-        "total_amount": inv.total_amount,
-        "vendor_gstin": inv.vendor_gstin,
-    })
+    # Build and store forensic report
+    forensic_report = None
+    if file_bytes:
+        invoice_date_for_forensics = norm.get("invoice_date")
+        forensic_report = build_forensic_report(file_bytes, filename, invoice_date_for_forensics)
+    
+    # Enhanced cryptographic seal
+    seal_record = build_seal_record(inv)
+    inv.record_hash = seal(seal_record)
+    inv.seal_signature = generate_signature(seal_record)
+    inv.sealed_at = dt.datetime.utcnow()
+    inv.forensic_metadata = forensic_report
+    
+    pipeline_events.append(build_pipeline_event("seal_applied", f"SHA-256: {inv.record_hash[:16]}…"))
+    
+    # Store pipeline log
+    inv.pipeline_log = pipeline_events
     db.commit()
 
     ticket_ids = []

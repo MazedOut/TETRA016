@@ -34,5 +34,8 @@ class Invoice(Base):
     edit_history = Column(JSON, nullable=True)              # append-only list: {actor, field, old_value, new_value, timestamp}
 
     record_hash = Column(String, nullable=True)            # SHA-256 seal
-
+    seal_signature = Column(String, nullable=True)         # HMAC-SHA256 signature
+    sealed_at = Column(DateTime, nullable=True)            # when seal was applied
+    forensic_metadata = Column(JSON, nullable=True)        # pikepdf/fitz forensic results
+    pipeline_log = Column(JSON, nullable=True)             # array of {event, detail, timestamp, actor} entries
     created_at = Column(DateTime)

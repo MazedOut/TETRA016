@@ -334,7 +334,14 @@ def invoice_detail(invoice_id: str, db: Session = Depends(get_db)):
         "financialExposure": {
             "itcAtRisk": (float(inv.cgst or 0) + float(inv.sgst or 0) + float(inv.igst or 0)) if inv.risk_level == "high" else 0,
             "msmePenalty": msme_penalty_res.get("penalty_amount", 0) if "msme_penalty_res" in locals() else 0
-        }
+        },
+        "seal": {
+            "hash": inv.record_hash,
+            "signature": inv.seal_signature,
+            "algorithm": "HMAC-SHA256",
+            "sealed_at": inv.sealed_at.isoformat() if inv.sealed_at else None,
+        } if inv.record_hash else None,
+        "forensicMetadata": inv.forensic_metadata,
     }
 
 @router.post("/invoices/upload")
@@ -367,6 +374,42 @@ async def upload_invoices(files: list[UploadFile] = File(...), db: Session = Dep
     for item in result["rejected"]:
         out.append({"filename": item["filename"], "status": "rejected"})
     return out
+
+@router.post("/invoices/{invoice_id}/verify-seal")
+def verify_invoice_seal(invoice_id: str, db: Session = Depends(get_db)):
+    """Re-hash current invoice data and compare to stored cryptographic seal."""
+    from app.audit_trail.hash_sealer import verify_full_seal, build_seal_record, seal
+    real_id = int(invoice_id.replace("INV-", ""))
+    inv = db.query(Invoice).filter(Invoice.id == real_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    if not inv.record_hash:
+        return {"valid": False, "reason": "No seal exists for this invoice"}
+    
+    result = verify_full_seal(inv, inv.record_hash, inv.seal_signature or "")
+    return result
+
+@router.get("/invoices/{invoice_id}/forensics")
+def get_invoice_forensics(invoice_id: str, db: Session = Depends(get_db)):
+    """Return stored forensic metadata for an invoice."""
+    real_id = int(invoice_id.replace("INV-", ""))
+    inv = db.query(Invoice).filter(Invoice.id == real_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return inv.forensic_metadata or {}
+
+@router.get("/invoices/{invoice_id}/audit-trail")
+def get_invoice_audit_trail(invoice_id: str, db: Session = Depends(get_db)):
+    """Return complete chronological audit trail for an invoice."""
+    from app.audit_trail.history_log import build_audit_trail
+    real_id = int(invoice_id.replace("INV-", ""))
+    inv = db.query(Invoice).filter(Invoice.id == real_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    tickets = db.query(Ticket).filter(Ticket.invoice_id == real_id).all()
+    trail = build_audit_trail(inv, tickets)
+    return {"invoice_id": invoice_id, "events": trail, "total": len(trail)}
 
 @router.post("/dev/reset")
 def reset_database(db: Session = Depends(get_db)):
