@@ -16,3 +16,9 @@ backend/synthetic_data/output/*
 
 # OS
 .DS_Store
+
+# Local test artifacts
+backend/test_invoice.pdf
+backend/messy_invoice.pdf
+backend/messy_invoice_scan.png
+backend/make_test_invoice.py

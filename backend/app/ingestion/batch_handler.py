@@ -1,10 +1,35 @@
-"""
-Bulk upload handling; builds the invalid-file summary for the user decision form (skip/retry/review).
+"""Bulk upload handling; builds invalid-file summary for skip/retry/review.
+Also runs extraction + forensics on every accepted file."""
+from .file_validator import validate
+from .content_sniff import has_extractable_content
+from app.extraction.pipeline import extract_invoice
+from app.reconciliation.forensics import run_forensics
 
-Pipeline stage: Stage 1 - Ingestion
-Status: stub — not yet implemented.
-"""
+def process_batch(files: list[tuple[str, bytes]]) -> dict:
+    """files: list of (filename, raw_bytes). Returns processed + rejected lists."""
+    processed, rejected = [], []
+    for filename, data in files:
+        ok, reason = validate(filename, data)
+        if not ok:
+            rejected.append({"filename": filename, "reason": reason})
+            continue
+        readable, reason = has_extractable_content(filename, data)
+        if not readable:
+            rejected.append({"filename": filename, "reason": reason})
+            continue
 
+        try:
+            extraction = extract_invoice(filename, data)
+        except Exception as e:
+            rejected.append({"filename": filename, "reason": f"extraction failed: {e}"})
+            continue
 
-def not_implemented():
-    raise NotImplementedError("backend/app/ingestion/batch_handler.py is a scaffold stub. Implement this module.")
+        forensics = run_forensics(data, filename)
+
+        processed.append({
+            "filename": filename,
+            "extraction": extraction,
+            "forensics": forensics,
+        })
+
+    return {"processed": processed, "rejected": rejected, "total": len(files)}

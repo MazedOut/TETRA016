@@ -4,7 +4,7 @@ pandas
 paddleocr
 paddlepaddle
 pytesseract
-google-generativeai
+google-genai
 rapidfuzz
 pikepdf
 pymupdf
