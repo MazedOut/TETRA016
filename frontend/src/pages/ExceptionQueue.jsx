@@ -3,6 +3,7 @@ import { fetchTickets, submitBulkResolve } from "../api/client.js";
 import TicketCard from "../components/TicketCard.jsx";
 import RiskConfidenceFilter from "../components/RiskConfidenceFilter.jsx";
 import MergeConfirmModal from "../components/MergeConfirmModal.jsx";
+import FolderView from "../components/FolderView.jsx";
 import { useMode } from "../context/ModeContext.jsx";
 
 const EXCEPTION_LABELS = {
@@ -16,6 +17,7 @@ const EXCEPTION_LABELS = {
   invisible_text_detected: "Hidden Text Spans",
   benford_deviation: "Benford Law Deviations",
   vendor_activity_anomaly: "Vendor Activity Anomalies",
+  needs_review: "Needs Human Review",
 };
 
 export default function ExceptionQueue() {
@@ -27,6 +29,7 @@ export default function ExceptionQueue() {
   const [groupBy, setGroupBy] = useState("exception_type"); // "exception_type" | "risk_level" | "invoice" | "flat"
   const [collapsed, setCollapsed] = useState({});
   const [bulkResolving, setBulkResolving] = useState(false);
+  const [showFolders, setShowFolders] = useState(false);
 
   function loadTickets() {
     fetchTickets(filters).then(setTickets);
@@ -92,13 +95,13 @@ export default function ExceptionQueue() {
 
     if (groupBy === "risk_level") {
       const groups = {
-        high: { key: "high", label: "High Risk (Score ≥ 61)", items: [] },
-        review: { key: "review", label: "Review Needed (Score 21-60)", items: [] },
-        clear: { key: "clear", label: "Clear / Low Risk (Score < 21)", items: [] },
+        high: { key: "high", label: "High Risk (Score ≥ 50)", items: [] },
+        review: { key: "review", label: "Review Needed (Score 20-49)", items: [] },
+        clear: { key: "clear", label: "Clear / Low Risk (Score < 20)", items: [] },
       };
       tickets.forEach((t) => {
-        if (t.riskScore >= 61) groups.high.items.push(t);
-        else if (t.riskScore >= 21) groups.review.items.push(t);
+        if (t.riskScore >= 50) groups.high.items.push(t);
+        else if (t.riskScore >= 20) groups.review.items.push(t);
         else groups.clear.items.push(t);
       });
       return Object.values(groups).filter((g) => g.items.length > 0);
@@ -135,47 +138,64 @@ export default function ExceptionQueue() {
           </p>
         </div>
 
-        {/* View Grouping Controls */}
-        <div className="flex items-center gap-1.5 bg-ink-700 p-1 rounded-lg text-xs font-mono">
-          <span className="text-paper/60 px-2 text-[11px]">Group by:</span>
+        {/* View & Folder Controls */}
+        <div className="flex items-center gap-3 flex-wrap">
           <button
-            onClick={() => setGroupBy("exception_type")}
-            className={"px-2.5 py-1 rounded transition-colors " + (groupBy === "exception_type" ? "bg-paper text-ink font-semibold" : "text-paper/70 hover:text-paper")}
+            onClick={() => setShowFolders(!showFolders)}
+            className="px-3 py-1.5 rounded-lg bg-ink-700 hover:bg-ink-600 text-paper text-xs font-mono border border-ink-600 transition-colors"
           >
-            Category
+            {showFolders ? "Hide Folders ▲" : "📁 Folder View ▼"}
           </button>
-          <button
-            onClick={() => setGroupBy("risk_level")}
-            className={"px-2.5 py-1 rounded transition-colors " + (groupBy === "risk_level" ? "bg-paper text-ink font-semibold" : "text-paper/70 hover:text-paper")}
-          >
-            Risk Level
-          </button>
-          <button
-            onClick={() => setGroupBy("invoice")}
-            className={"px-2.5 py-1 rounded transition-colors " + (groupBy === "invoice" ? "bg-paper text-ink font-semibold" : "text-paper/70 hover:text-paper")}
-          >
-            Invoice
-          </button>
-          <button
-            onClick={() => setGroupBy("flat")}
-            className={"px-2.5 py-1 rounded transition-colors " + (groupBy === "flat" ? "bg-paper text-ink font-semibold" : "text-paper/70 hover:text-paper")}
-          >
-            Flat List
-          </button>
+
+          <div className="flex items-center gap-1.5 bg-ink-700 p-1 rounded-lg text-xs font-mono">
+            <span className="text-paper/60 px-2 text-[11px]">Group by:</span>
+            <button
+              onClick={() => setGroupBy("exception_type")}
+              className={"px-2.5 py-1 rounded transition-colors " + (groupBy === "exception_type" ? "bg-paper text-ink font-semibold" : "text-paper/70 hover:text-paper")}
+            >
+              Category
+            </button>
+            <button
+              onClick={() => setGroupBy("risk_level")}
+              className={"px-2.5 py-1 rounded transition-colors " + (groupBy === "risk_level" ? "bg-paper text-ink font-semibold" : "text-paper/70 hover:text-paper")}
+            >
+              Risk Level
+            </button>
+            <button
+              onClick={() => setGroupBy("invoice")}
+              className={"px-2.5 py-1 rounded transition-colors " + (groupBy === "invoice" ? "bg-paper text-ink font-semibold" : "text-paper/70 hover:text-paper")}
+            >
+              Invoice
+            </button>
+            <button
+              onClick={() => setGroupBy("flat")}
+              className={"px-2.5 py-1 rounded transition-colors " + (groupBy === "flat" ? "bg-paper text-ink font-semibold" : "text-paper/70 hover:text-paper")}
+            >
+              Flat List
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Category Summary Quick Badges Bar */}
+      {/* Folder System Component */}
+      {showFolders && (
+        <FolderView
+          selectedFolder={filters.folder}
+          onSelectFolder={(f) => setFilters((prev) => ({ ...prev, folder: f }))}
+        />
+      )}
+
+      {/* Category Summary Quick Badges Bar (High-Contrast Cream Cards) */}
       {Object.keys(categoryCounts).length > 0 && (
-        <div className="paper-surface rounded-lg p-3 text-ink flex items-center gap-2 flex-wrap text-xs font-mono">
-          <span className="text-ink-600 font-semibold uppercase text-[10px] tracking-wider mr-1">Category Breakdown:</span>
+        <div className="paper-surface rounded-lg p-3 text-ink flex items-center gap-2 flex-wrap text-xs font-mono border border-ink-600/20">
+          <span className="text-ink-700 font-bold uppercase text-[10px] tracking-wider mr-1">Category Breakdown:</span>
           {Object.entries(categoryCounts).map(([cat, count]) => (
             <span
               key={cat}
               onClick={() => setGroupBy("exception_type")}
-              className="cursor-pointer px-2.5 py-1 rounded-full bg-ink/10 border border-ink-600/20 hover:border-stamp-red/40 flex items-center gap-1.5 transition-colors"
+              className="cursor-pointer px-2.5 py-1 rounded-full bg-paper border border-ink-600/30 hover:border-stamp-red flex items-center gap-1.5 transition-colors shadow-sm"
             >
-              <span className="font-semibold text-ink-700">{EXCEPTION_LABELS[cat] || cat}:</span>
+              <span className="font-semibold text-ink font-body">{EXCEPTION_LABELS[cat] || cat}:</span>
               <span className="bg-stamp-red text-paper px-1.5 py-0.2 rounded-full font-bold text-[10px]">{count}</span>
             </span>
           ))}
@@ -185,7 +205,7 @@ export default function ExceptionQueue() {
       {/* Filter Toolbar */}
       <RiskConfidenceFilter onChange={setFilters} />
 
-      {/* Bulk Action Toolbar Banner (when 1 or more checkboxes selected) */}
+      {/* Bulk Action Toolbar Banner */}
       {selected.length > 0 && (
         <div className="bg-stamp-amber/15 border border-stamp-amber/40 rounded-lg p-3 text-ink flex items-center justify-between flex-wrap gap-3 text-sm font-mono animate-fadeIn">
           <div className="flex items-center gap-3">
@@ -236,7 +256,7 @@ export default function ExceptionQueue() {
               {groupBy !== "flat" && (
                 <div
                   onClick={() => toggleCollapse(group.key)}
-                  className="flex items-center justify-between cursor-pointer py-2 px-3 bg-paper-surface/60 rounded-md border border-ink-600/20 hover:border-ink-600/40 text-ink transition-colors"
+                  className="flex items-center justify-between cursor-pointer py-2.5 px-3.5 bg-paper-surface rounded-md border border-ink-600/20 hover:border-ink-600/40 text-ink transition-colors shadow-sm"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono text-ink-600 font-bold">{isCollapsed ? "▶" : "▼"}</span>

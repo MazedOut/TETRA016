@@ -1,16 +1,71 @@
-"""Orchestrates the full per-invoice pipeline: extraction -> forensics ->
-reconciliation checks -> risk scoring -> narrative -> persistence -> tickets."""
+import os
+import pandas as pd
 import datetime as dt
 from sqlalchemy.orm import Session
 
 from app.reconciliation.gstin_validator import validate as gstin_validate
 from app.reconciliation.duplicate_detector import detect_duplicates
+from app.reconciliation.ledger_matcher import match_ledger
+from app.reconciliation.mismatch_checks import check_mismatches
+from app.reconciliation.vendor_matcher import match_vendor
 from app.scoring.risk_scorer import score_invoice
 from app.ai_layer.narrative_generator import generate_narratives
 from app.ai_layer.msme_translator import translate_for_msme
 from app.audit_trail.ticket_manager import create_ticket
 from app.audit_trail.hash_sealer import seal
 from app.models.invoice import Invoice
+from app.models.vendor import Vendor
+from app.models.ledger_entry import LedgerEntry
+
+SYNTHETIC_DIR = os.path.join(os.path.dirname(__file__), "..", "synthetic_data", "output")
+
+
+def _get_ledger_df(db: Session = None) -> pd.DataFrame | None:
+    if db is not None:
+        try:
+            entries = db.query(LedgerEntry).all()
+            if entries:
+                return pd.DataFrame([{
+                    "invoice_number": e.invoice_number,
+                    "vendor_name": e.vendor_name,
+                    "total_amount": e.total_amount,
+                    "posting_date": pd.to_datetime(e.posting_date) if e.posting_date else None,
+                } for e in entries])
+        except Exception:
+            pass
+
+    path = os.path.join(SYNTHETIC_DIR, "ledger.csv")
+    if os.path.exists(path):
+        try:
+            df = pd.read_csv(path)
+            if "posting_date" in df.columns:
+                df["posting_date"] = pd.to_datetime(df["posting_date"])
+            return df
+        except Exception:
+            return None
+    return None
+
+
+def _get_vendor_master_df(db: Session = None) -> pd.DataFrame | None:
+    if db is not None:
+        try:
+            vendors = db.query(Vendor).all()
+            if vendors:
+                return pd.DataFrame([{
+                    "vendor_name": v.name,
+                    "gstin": v.gstin,
+                    "category": v.category,
+                } for v in vendors])
+        except Exception:
+            pass
+
+    path = os.path.join(SYNTHETIC_DIR, "vendor_master.csv")
+    if os.path.exists(path):
+        try:
+            return pd.read_csv(path)
+        except Exception:
+            return None
+    return None
 
 
 def _to_float(v):
@@ -47,20 +102,39 @@ def _normalize_for_checks(fields: dict) -> dict:
     }
 
 
-def process_invoice(db: Session, filename: str, extraction: dict, forensics: dict) -> dict:
+from app.classification.folder_sorter import sort_invoice
+from app.classification.vendor_cache import VendorCache
+
+
+def process_invoice(
+    db: Session,
+    filename: str,
+    extraction: dict,
+    forensics: dict,
+    ledger_df: pd.DataFrame = None,
+    vendor_master_df: pd.DataFrame = None,
+    file_bytes: bytes = None,
+) -> dict:
     """Runs reconciliation + risk scoring + narrative + persistence for ONE
     already-extracted invoice."""
     norm = _normalize_for_checks(extraction["fields"])
     flags = []
 
-    if not extraction["math_ok"]:
-        flags.append({"check": "internal_math_error", "reason": extraction["math_reason"]})
+    if not extraction.get("math_ok", True):
+        flags.append({"check": "internal_math_error", "reason": extraction.get("math_reason", "Calculation mismatch.")})
 
     if forensics and forensics.get("metadata_tamper", {}).get("flagged"):
         flags.append({"check": "pdf_metadata_tamper", "reason": forensics["metadata_tamper"].get("reason", "")})
     if forensics and forensics.get("invisible_text", {}).get("flagged"):
         spans = forensics["invisible_text"].get("suspicious_spans", 0)
         flags.append({"check": "invisible_text_detected", "reason": f"{spans} suspicious text span(s) found."})
+
+    needs_review_fields = extraction.get("needs_review", [])
+    if needs_review_fields:
+        flags.append({
+            "check": "needs_review",
+            "reason": f"Invoice requires human review. Missing/uncertain fields: {', '.join(needs_review_fields)}.",
+        })
 
     flags.extend(gstin_validate(norm))
 
@@ -77,10 +151,33 @@ def process_invoice(db: Session, filename: str, extraction: dict, forensics: dic
         if d["invoice_index"] == my_index:
             flags.append({"check": "duplicate_invoice", "reason": d["reason"]})
 
-    # TODO: vendor_matcher.match_vendor() — needs a vendor_master.csv, not yet
-    # available anywhere in config/synthetic_data. Wire in once that exists.
-    # TODO: mismatch_checks.check_mismatches() — needs a ledger row per invoice,
-    # not yet available. Wire in once ledger loading exists.
+    # vendor_matcher check
+    vm_df = vendor_master_df if vendor_master_df is not None else _get_vendor_master_df(db)
+    if vm_df is not None and not vm_df.empty:
+        vm_res = match_vendor(norm, vm_df)
+        if vm_res.get("flagged"):
+            flags.append({"check": vm_res["check"], "reason": vm_res["reason"]})
+
+    # ledger_matcher & mismatch checks
+    l_df = ledger_df if ledger_df is not None else _get_ledger_df(db)
+    if l_df is not None and not l_df.empty:
+        lm_res = match_ledger(norm, l_df)
+        if not lm_res.get("matched"):
+            if "flag" in lm_res:
+                flags.append({"check": lm_res["flag"]["check"], "reason": lm_res["flag"]["reason"]})
+        else:
+            ledger_row = lm_res.get("ledger_row")
+            if ledger_row:
+                mismatches = check_mismatches(norm, ledger_row)
+                for m in mismatches:
+                    if m.get("flagged"):
+                        flags.append({"check": m["check"], "reason": m["reason"]})
+
+    # Auto classification & folder sorting
+    cache_path = os.path.join(SYNTHETIC_DIR, "vendor_cache.csv")
+    master_path = os.path.join(SYNTHETIC_DIR, "vendor_master.csv")
+    v_cache = VendorCache(cache_path=cache_path, seed_path=master_path)
+    sort_res = sort_invoice(extraction.get("fields", {}), v_cache)
 
     scoring = score_invoice(flags)
     scoring = generate_narratives(scoring)
@@ -97,17 +194,29 @@ def process_invoice(db: Session, filename: str, extraction: dict, forensics: dic
         taxable_value=norm["taxable_value"],
         cgst=norm["cgst"], sgst=norm["sgst"], igst=norm["igst"],
         total_amount=norm["total_amount"],
-        field_confidence=extraction["field_confidence"],
-        extracted_raw=extraction["fields"],
+        field_confidence=extraction.get("field_confidence"),
+        extracted_raw=extraction.get("fields"),
         risk_score=scoring["risk_score"],
         risk_level=scoring["risk_level"],
-        confidence_score=extraction["avg_conf"] / 100,
+        confidence_score=extraction.get("avg_conf", 100) / 100,
+        ocr_source=extraction.get("ocr_source", "tesseract"),
+        folder=sort_res.get("folder", "extra"),
         source_file_path=filename,
         created_at=dt.datetime.utcnow(),
     )
     db.add(inv)
     db.commit()
     db.refresh(inv)
+
+    if file_bytes:
+        uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads", str(inv.id))
+        os.makedirs(uploads_dir, exist_ok=True)
+        rel_path = f"uploads/{inv.id}/{filename}"
+        full_path = os.path.join(os.path.dirname(__file__), "..", rel_path)
+        with open(full_path, "wb") as f:
+            f.write(file_bytes)
+        inv.source_file_path = rel_path
+        db.commit()
 
     inv.record_hash = seal({
         "invoice_number": inv.invoice_number,
@@ -135,4 +244,4 @@ def process_invoice(db: Session, filename: str, extraction: dict, forensics: dic
         "summary": scoring.get("summary"),
         "ticket_ids": ticket_ids,
         "needs_review": extraction.get("needs_review", []),
-    }
+    }

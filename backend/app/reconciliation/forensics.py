@@ -19,7 +19,7 @@ def check_metadata_tamper(pdf_bytes: bytes) -> dict:
             "flagged": flagged,
             "producer": str(meta.get("/Producer", "")),
             "creator": str(meta.get("/Creator", "")),
-            "reason": "created/edited with image-editing software" if flagged else "",
+            "reason": "Document metadata indicates editing/re-saving activity — review signal only, not proof of tampering." if flagged else "",
         }
     except Exception as e:
         return {"flagged": False, "producer": "", "creator": "", "reason": f"metadata unreadable: {e}"}
@@ -57,7 +57,7 @@ def check_image_metadata(img_bytes: bytes) -> dict:
         return {
             "flagged": flagged,
             "software": tags.get("Software", ""),
-            "reason": "edited with image-editing software" if flagged else "",
+            "reason": "Document metadata indicates editing/re-saving activity — review signal only, not proof of tampering." if flagged else "",
         }
     except Exception as e:
         return {"flagged": False, "software": None, "reason": f"metadata unreadable: {e}"}

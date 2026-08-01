@@ -11,7 +11,9 @@ from app.models.invoice import Invoice
 from app.models.ticket import Ticket
 from app.models.vendor import Vendor
 from app.models.ledger_entry import LedgerEntry
+from app.models.folder import Folder
 Base.metadata.create_all(engine)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,5 +43,6 @@ from app.api import routes_tickets, routes_dashboard
 app.include_router(routes_tickets.router, prefix="/tickets", tags=["tickets"])
 app.include_router(routes_dashboard.router, prefix="/dashboard", tags=["dashboard"])
 
-from app.api import routes_frontend_adapter
+from app.api import routes_frontend_adapter, routes_reports
 app.include_router(routes_frontend_adapter.router, prefix="/api", tags=["frontend-adapter"])
+app.include_router(routes_reports.router, prefix="/api/reports", tags=["reports"])

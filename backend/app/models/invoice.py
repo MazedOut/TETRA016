@@ -25,9 +25,13 @@ class Invoice(Base):
     risk_score = Column(Float, default=0)
     risk_level = Column(String, default="low")           # low / medium / high
     confidence_score = Column(Float, default=0)
+    ocr_source = Column(String, nullable=True)           # tesseract / gemini / pdf_text
+
 
     folder = Column(String, nullable=True)                # auto-sorted or user-assigned
+    folder_id = Column(Integer, nullable=True)             # linked Folder model ID
     source_file_path = Column(String, nullable=True)
+
     record_hash = Column(String, nullable=True)            # SHA-256 seal
 
     created_at = Column(DateTime)

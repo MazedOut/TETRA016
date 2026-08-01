@@ -2,18 +2,8 @@
 Amount mismatch and date mismatch checks against ledger, with configurable thresholds.
 
 Pipeline stage: Stage 4 - Reconciliation
-Status: stub — not yet implemented.
 """
 
-
-def not_implemented():
-    raise NotImplementedError("backend/app/reconciliation/mismatch_checks.py is a scaffold stub. Implement this module.")
-
-"""
-Amount mismatch and date mismatch checks against ledger, with configurable thresholds.
-
-Pipeline stage: Stage 4 - Reconciliation
-"""
 AMOUNT_MISMATCH_TOLERANCE = 0.01   # 1% — differences above this are flagged
 DATE_MISMATCH_THRESHOLD_DAYS = 7   # posting more than this many days off invoice date is flagged
 

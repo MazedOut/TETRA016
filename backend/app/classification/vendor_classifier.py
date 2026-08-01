@@ -2,24 +2,14 @@
 First-seen vendor gets one AI or manual classification call, then cached.
 
 Pipeline stage: Stage 3 - Classification
-Status: stub — not yet implemented.
-"""
-
-
-def not_implemented():
-    raise NotImplementedError("backend/app/classification/vendor_classifier.py is a scaffold stub. Implement this module.")
-
-"""
-First-seen vendor gets one AI or manual classification call, then cached.
-
-Pipeline stage: Stage 3 - Classification
 """
 import json
-import google.generativeai as genai
+from google import genai
 from app.config import GEMINI_API_KEY
 from app.classification.vendor_cache import VendorCache
 
-genai.configure(api_key=GEMINI_API_KEY)
+_client = genai.Client(api_key=GEMINI_API_KEY)
+
 
 CATEGORY_OPTIONS = [
     "raw_materials", "electronics", "logistics", "office_supplies", "textiles",
@@ -46,8 +36,12 @@ def _call_ai_classifier(vendor_name: str) -> str:
         vendor_name=vendor_name,
     )
     try:
-        response = _model.generate_content(prompt)
+        response = _client.models.generate_content(
+            model="gemini-flash-latest",
+            contents=[prompt],
+        )
         text = response.text.strip()
+
         # Strip markdown code fences if the model wraps its JSON in them anyway
         text = text.replace("```json", "").replace("```", "").strip()
         parsed = json.loads(text)

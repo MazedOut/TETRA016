@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Document, Page } from "react-pdf";
 import { fetchInvoiceDetail } from "../api/client.js";
 import ResolutionForm from "../components/ResolutionForm.jsx";
 import VendorCorrectionForm from "../components/VendorCorrectionForm.jsx";
@@ -17,6 +16,7 @@ const EXCEPTION_TITLES = {
   invisible_text_detected: "Hidden Text Detected",
   benford_deviation: "Benford Law Numeric Anomaly",
   vendor_activity_anomaly: "Vendor Volume Anomaly",
+  needs_review: "Needs Human Review",
 };
 
 function confidenceColor(scorePct) {
@@ -46,7 +46,7 @@ export default function InvoiceDetail() {
     fetchInvoiceDetail(id).then(setInvoice);
   }, [id]);
 
-  if (!invoice) return <p className="text-sm text-paper/60">Loading invoice…</p>;
+  if (!invoice) return <p className="text-sm text-paper/60 p-6">Loading invoice…</p>;
 
   const overallConfPct = Math.round((invoice.extractionConfidence || 0) * 100);
 
@@ -57,17 +57,39 @@ export default function InvoiceDetail() {
           <Link to="/exceptions" className="text-xs font-mono text-paper/50 hover:text-paper">
             &larr; back to queue
           </Link>
-          <h2 className="font-display text-2xl font-semibold mt-1">{invoice.id}</h2>
-          <p className="text-sm text-paper/60">{invoice.vendor} &bull; <span className="font-mono text-xs">{invoice.gstin}</span></p>
+          <div className="flex items-center gap-3 mt-1">
+            <h2 className="font-display text-2xl font-semibold">{invoice.id}</h2>
+            {invoice.folder && (
+              <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-ink-700 text-paper border border-ink-600">
+                📁 {invoice.folder}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-paper/60 mt-0.5">
+            {invoice.vendor} &bull; <span className="font-mono text-xs">{invoice.gstin}</span>
+          </p>
         </div>
         <div className="flex gap-2">
-          <a href={buildDisputeMailto(invoice)} className="bg-ink-700 border border-ink-600 text-paper px-4 py-2 rounded-md text-sm font-medium hover:bg-ink-600">
+          {invoice.fileUrl && (
+            <a
+              href={invoice.fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-paper text-ink border border-ink-600/30 px-4 py-2 rounded-md text-sm font-medium hover:bg-paper-dim transition-colors"
+            >
+              📄 View Original Document ↗
+            </a>
+          )}
+          <a
+            href={buildDisputeMailto(invoice)}
+            className="bg-ink-700 border border-ink-600 text-paper px-4 py-2 rounded-md text-sm font-medium hover:bg-ink-600 transition-colors"
+          >
             Draft dispute email
           </a>
           <button
             onClick={() => setShowResolve(true)}
             disabled={resolved}
-            className="bg-stamp-red text-paper px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+            className="bg-stamp-red text-paper px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 hover:bg-stamp-red/90 transition-colors"
           >
             {resolved ? "Resolved" : "Resolve ticket"}
           </button>
@@ -75,19 +97,23 @@ export default function InvoiceDetail() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="paper-surface rounded-lg p-4 text-ink min-h-[420px] flex items-center justify-center">
+        {/* Document Viewer Frame */}
+        <div className="paper-surface rounded-lg p-4 text-ink min-h-[460px] flex flex-col items-center justify-center">
           {invoice.fileUrl ? (
-            <Document file={invoice.fileUrl}>
-              <Page pageNumber={1} width={380} />
-            </Document>
+            <iframe
+              src={invoice.fileUrl}
+              title={`Invoice File ${invoice.id}`}
+              className="w-full h-[520px] rounded border border-ink-600/20"
+            />
           ) : (
-            <div className="text-center text-ink-600 text-sm font-mono p-8">
-              <p>Original PDF preview renders here once</p>
-              <p>the backend serves invoice.fileUrl.</p>
+            <div className="text-center text-ink-600 text-sm font-mono p-8 space-y-2">
+              <p className="font-semibold text-ink">Original PDF / Scan Document</p>
+              <p className="text-xs">No stored file bytes associated with this record.</p>
             </div>
           )}
         </div>
 
+        {/* Extracted Fields & Flags */}
         <div className="paper-surface rounded-lg p-6 text-ink space-y-5">
           <div className="flex items-baseline justify-between">
             <h3 className="font-display text-lg font-semibold">Extracted fields</h3>
@@ -98,7 +124,9 @@ export default function InvoiceDetail() {
 
           <div>
             <div className="flex justify-between items-baseline mb-1">
-              <span className="text-[11px] uppercase tracking-wider text-ink-600 font-mono">Overall extraction confidence</span>
+              <span className="text-[11px] uppercase tracking-wider text-ink-600 font-mono font-bold">
+                Overall extraction confidence
+              </span>
               <span className={`text-xs font-mono ${confidenceColor(overallConfPct)}`}>{overallConfPct}%</span>
             </div>
             <div className="h-1.5 w-full bg-paper-dim rounded-full overflow-hidden">
@@ -116,7 +144,7 @@ export default function InvoiceDetail() {
                 <div key={f.label} className="flex items-center justify-between border-b border-ink-600/10 pb-2">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-ink-600 font-mono">{f.label}</p>
-                    <p className="font-mono text-sm">{f.value || <span className="text-ink-600 italic">null</span>}</p>
+                    <p className="font-mono text-sm font-medium">{f.value || <span className="text-ink-600 italic">null</span>}</p>
                   </div>
                   <span className={`text-xs font-mono ${confidenceColor(confPct)}`}>{confPct}%</span>
                 </div>
@@ -135,7 +163,7 @@ export default function InvoiceDetail() {
                 return (
                   <div key={i} className="text-sm border-b border-stamp-red/20 pb-2 last:border-0 last:pb-0">
                     <span className="font-mono font-semibold text-xs text-stamp-red block">{title}</span>
-                    <p className="text-xs mt-1 text-ink leading-relaxed">{narrative}</p>
+                    <p className="text-xs mt-1 text-ink leading-relaxed font-sans">{narrative}</p>
                   </div>
                 );
               })}

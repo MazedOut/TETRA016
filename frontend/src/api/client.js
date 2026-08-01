@@ -244,4 +244,15 @@ export async function generateReport(payload) {
   return data;
 }
 
+export async function createFolder(payload) {
+  const { data } = await client.post("/folders", payload);
+  return data;
+}
+
+export async function moveInvoiceToFolder(invoiceId, folder) {
+  const { data } = await client.post(`/invoices/${invoiceId}/move`, { folder });
+  return data;
+}
+
+
 export default client;

@@ -13,6 +13,9 @@ dist/
 # Synthetic/generated output
 backend/synthetic_data/output/*
 !backend/synthetic_data/output/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+
 
 # OS
 .DS_Store

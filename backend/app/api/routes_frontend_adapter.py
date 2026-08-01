@@ -6,6 +6,8 @@ from sqlalchemy import func
 from app.db.database import get_db
 from app.models.invoice import Invoice
 from app.models.ticket import Ticket
+from app.models.vendor import Vendor
+from app.models.folder import Folder
 from app.audit_trail.ticket_manager import update_status, mark_false_positive, merge_tickets
 from app.ingestion.batch_handler import process_batch
 from app.orchestrator import process_invoice
@@ -46,18 +48,46 @@ def _ticket_to_frontend_shape(t: Ticket, inv: Invoice = None) -> dict:
         "msmeNarrative": msme_nar,
     }
 
+from fastapi.responses import FileResponse
+import os
+from app.models.folder import Folder
+from app.scoring.itc_calculator import calculate_itc_at_risk
+from app.scoring.msme_penalty import calculate_batch_penalties
+from app.db.seed import seed
+
 @router.get("/stats")
 def stats(db: Session = Depends(get_db)):
-    total = db.query(func.count(Invoice.id)).scalar() or 0
+    invoices = db.query(Invoice).all()
+    total = len(invoices)
     open_tickets = db.query(func.count(Ticket.id)).filter(Ticket.status == "open").scalar() or 0
     avg_conf = db.query(func.avg(Invoice.confidence_score)).scalar() or 0
+
+    invoices_data = [{
+        "risk_level": inv.risk_level,
+        "cgst": inv.cgst,
+        "sgst": inv.sgst,
+        "igst": inv.igst,
+        "total_amount": inv.total_amount,
+        "invoice_date": inv.invoice_date,
+        "invoice_number": inv.invoice_number,
+    } for inv in invoices]
+
+    itc_res = calculate_itc_at_risk(invoices_data)
+    msme_res = calculate_batch_penalties(invoices_data)
+
+    gemini_count = sum(1 for inv in invoices if getattr(inv, "ocr_source", None) == "gemini")
+    avoided_count = total - gemini_count
+
     return {
-        "itcAtRiskInr": 0,  # TODO: wire once itc_calculator.py output is available per-invoice
+        "itcAtRiskInr": itc_res["itc_at_risk"],
         "invoicesProcessed": total,
         "openTickets": open_tickets,
         "avgConfidence": round(avg_conf, 2),
-        "msmePenaltyExposureInr": 0,  # TODO: wire once msme_penalty.py output is available
+        "msmePenaltyExposureInr": msme_res["total_estimated_penalty"],
+        "aiFallbackCount": gemini_count,
+        "aiCallsAvoided": max(0, avoided_count),
     }
+
 
 @router.get("/stats/risk-distribution")
 def risk_distribution(db: Session = Depends(get_db)):
@@ -70,8 +100,91 @@ def risk_distribution(db: Session = Depends(get_db)):
         result.append({"bucket": f"{lo}-{hi}", "count": count})
     return result
 
+@router.get("/folders")
+def get_folders(db: Session = Depends(get_db)):
+    folder_counts = db.query(
+        Invoice.folder,
+        func.count(Invoice.id).label("count")
+    ).group_by(Invoice.folder).all()
+
+    db_folders = {f.name: f for f in db.query(Folder).all()}
+    vendors_map = {v.name: v.category for v in db.query(Vendor).all()}
+
+    out = []
+    seen = set()
+    for f_name, count in folder_counts:
+        if not f_name:
+            continue
+        seen.add(f_name)
+        f_obj = db_folders.get(f_name)
+        cat = f_obj.category if f_obj else (vendors_map.get(f_name, "General") or "General")
+        out.append({
+            "id": f_obj.id if f_obj else None,
+            "vendor": f_name,
+            "folder": f_name,
+            "count": count,
+            "category": str(cat).replace("_", " ").title(),
+        })
+
+    for f_name, f_obj in db_folders.items():
+        if f_name not in seen:
+            out.append({
+                "id": f_obj.id,
+                "vendor": f_name,
+                "folder": f_name,
+                "count": 0,
+                "category": str(f_obj.category or "General").replace("_", " ").title(),
+            })
+
+    return out
+
+
+@router.post("/folders")
+def create_folder(payload: dict, db: Session = Depends(get_db)):
+    name = payload.get("name")
+    category = payload.get("category", "General")
+    if not name:
+        return {"error": "Folder name required"}
+    
+    existing = db.query(Folder).filter(Folder.name == name).first()
+    if existing:
+        return {"ok": True, "folder": existing.name, "message": "Folder already exists"}
+
+    f = Folder(name=name, category=category)
+    db.add(f)
+    db.commit()
+    db.refresh(f)
+    return {"ok": True, "id": f.id, "folder": f.name, "category": f.category}
+
+
+@router.post("/invoices/{invoice_id}/move")
+def move_invoice_folder(invoice_id: str, payload: dict, db: Session = Depends(get_db)):
+    real_id = int(invoice_id.replace("INV-", ""))
+    inv = db.query(Invoice).filter(Invoice.id == real_id).first()
+    if not inv:
+        return {"error": "Invoice not found"}
+    
+    target_folder = payload.get("folder") or payload.get("folderName")
+    if not target_folder:
+        return {"error": "Target folder required"}
+
+    inv.folder = target_folder
+    f_obj = db.query(Folder).filter(Folder.name == target_folder).first()
+    if f_obj:
+        inv.folder_id = f_obj.id
+    db.commit()
+    return {"ok": True, "invoiceId": invoice_id, "folder": target_folder}
+
+
 @router.get("/tickets")
-def tickets(status: str = None, db: Session = Depends(get_db)):
+def tickets(
+    status: str = None,
+    minRisk: float = 0,
+    minConfidence: float = 0,
+    query: str = None,
+    folder: str = None,
+    db: Session = Depends(get_db)
+):
     q = db.query(Ticket)
     if status and status != "all":
         q = q.filter(Ticket.status == status)
@@ -79,7 +192,22 @@ def tickets(status: str = None, db: Session = Depends(get_db)):
     out = []
     for t in rows:
         inv = db.query(Invoice).filter(Invoice.id == t.invoice_id).first()
-        out.append(_ticket_to_frontend_shape(t, inv))
+        shape = _ticket_to_frontend_shape(t, inv)
+
+        if minRisk > 0 and (shape["riskScore"] or 0) < minRisk:
+            continue
+        if minConfidence > 0 and (shape["confidenceScore"] or 0) < minConfidence:
+            continue
+        if folder and inv and inv.folder != folder:
+            continue
+        if query:
+            q_lower = query.lower()
+            vendor_match = inv and inv.vendor_name and q_lower in inv.vendor_name.lower()
+            inv_id_match = shape["invoiceId"] and q_lower in shape["invoiceId"].lower()
+            if not (vendor_match or inv_id_match):
+                continue
+
+        out.append(shape)
     out.sort(key=lambda x: x["riskScore"] or 0, reverse=True)
     return out
 
@@ -111,6 +239,21 @@ def bulk_resolve_tickets(payload: dict, db: Session = Depends(get_db)):
         update_status(db, real_id, "resolved", actor, reason)
     return {"ok": True, "count": len(ticket_ids)}
 
+@router.get("/invoices/{invoice_id}/file")
+def get_invoice_file(invoice_id: str, db: Session = Depends(get_db)):
+    real_id = int(invoice_id.replace("INV-", ""))
+    inv = db.query(Invoice).filter(Invoice.id == real_id).first()
+    if not inv or not inv.source_file_path:
+        return {"error": "File not found"}
+    
+    full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", inv.source_file_path))
+    if not os.path.exists(full_path):
+        return {"error": "File not found on disk"}
+
+    ext = full_path.rsplit(".", 1)[-1].lower()
+    mime = "application/pdf" if ext == "pdf" else f"image/{ext}"
+    return FileResponse(full_path, media_type=mime, filename=os.path.basename(full_path))
+
 @router.get("/invoices/{invoice_id}")
 def invoice_detail(invoice_id: str, db: Session = Depends(get_db)):
     real_id = int(invoice_id.replace("INV-", ""))
@@ -120,11 +263,15 @@ def invoice_detail(invoice_id: str, db: Session = Depends(get_db)):
     tickets = db.query(Ticket).filter(Ticket.invoice_id == real_id).all()
     fields = inv.extracted_raw or {}
     conf = inv.field_confidence or {}
+
+    file_url = f"/api/invoices/{invoice_id}/file" if inv.source_file_path else None
+
     return {
         "id": invoice_id,
-        "fileUrl": None,
+        "fileUrl": file_url,
         "vendor": inv.vendor_name,
         "gstin": inv.vendor_gstin,
+        "folder": inv.folder,
         "invoiceDate": inv.invoice_date.isoformat()[:10] if inv.invoice_date else None,
         "extractionConfidence": inv.confidence_score,
         "fields": [
@@ -143,14 +290,27 @@ def invoice_detail(invoice_id: str, db: Session = Depends(get_db)):
 
 @router.post("/invoices/upload")
 async def upload_invoices(files: list[UploadFile] = File(...), db: Session = Depends(get_db)):
-    payload = [(f.filename, await f.read()) for f in files]
+    payload = []
+    file_bytes_map = {}
+    for f in files:
+        content = await f.read()
+        payload.append((f.filename, content))
+        file_bytes_map[f.filename] = content
+
     result = process_batch(payload)
     out = []
     for item in result["processed"]:
-        risk = process_invoice(db, item["filename"], item["extraction"], item["forensics"])
+        f_name = item["filename"]
+        risk = process_invoice(
+            db,
+            filename=f_name,
+            extraction=item["extraction"],
+            forensics=item["forensics"],
+            file_bytes=file_bytes_map.get(f_name),
+        )
         needs_review = risk.get("needs_review", [])
         out.append({
-            "filename": item["filename"],
+            "filename": f_name,
             "status": "needs-review" if needs_review else "accepted",
         })
     for item in result["rejected"]:
@@ -159,7 +319,6 @@ async def upload_invoices(files: list[UploadFile] = File(...), db: Session = Dep
 
 @router.post("/dev/reset")
 def reset_database(db: Session = Depends(get_db)):
-    db.query(Ticket).delete()
-    db.query(Invoice).delete()
-    db.commit()
-    return {"ok": True, "message": "All invoices and tickets cleared."}
+    seed()
+    return {"ok": True, "message": "Demo dataset reloaded successfully (60 invoices seeded)."}
+
