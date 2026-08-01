@@ -42,3 +42,6 @@ MSME_PAYMENT_DEADLINE_DAYS = 45
 MSME_DISALLOWED_TAX_RATE = 0.30
 
 CONFIDENCE_LOW_THRESHOLD = 0.80
+
+# --- Buyer (our company) identity, for inter/intra-state GST check ---
+BUYER_GSTIN = "24AABCU9876Q1Z8"  # Gujarat (state code 24) — adjust if your synthetic data uses a different home state
