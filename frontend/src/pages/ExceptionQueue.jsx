@@ -222,7 +222,9 @@ export default function ExceptionQueue() {
             <button
               onClick={handleBulkResolve}
               disabled={bulkResolving}
-              className="bg-stamp-green text-paper px-3.5 py-1.5 rounded-md text-xs font-medium hover:bg-stamp-green/90 disabled:opacity-50"
+              className="bg-stamp-green text-paper px-4 py-2 rounded-lg text-xs font-medium
+                         hover:bg-stamp-green/90 active:scale-[0.97] disabled:opacity-50
+                         transition-all duration-150"
             >
               {bulkResolving ? "Resolving..." : `✓ Bulk Resolve Selected (${selected.length})`}
             </button>
@@ -230,7 +232,9 @@ export default function ExceptionQueue() {
             {selected.length === 2 && (
               <button
                 onClick={() => setMergeOpen(true)}
-                className="bg-stamp-amber text-ink px-3.5 py-1.5 rounded-md text-xs font-medium hover:bg-stamp-amber/90 border border-ink/20 font-sans font-semibold"
+                className="bg-stamp-amber text-ink px-4 py-2 rounded-lg text-xs font-medium
+                         hover:bg-stamp-amber/90 border border-ink/20 font-sans font-semibold
+                         active:scale-[0.97] transition-all duration-150"
               >
                 🔀 Propose Merge (2)
               </button>
@@ -256,7 +260,8 @@ export default function ExceptionQueue() {
               {groupBy !== "flat" && (
                 <div
                   onClick={() => toggleCollapse(group.key)}
-                  className="flex items-center justify-between cursor-pointer py-2.5 px-3.5 bg-ink-800 rounded-md border border-ink-600/40 hover:border-ink-600 transition-colors shadow-sm"
+                  className="flex items-center justify-between cursor-pointer py-3 px-4 bg-ink-800 rounded-xl
+                             border border-ink-600/40 hover:border-ink-600 transition-all duration-150 shadow-sm"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono text-paper/60 font-bold">{isCollapsed ? "▶" : "▼"}</span>

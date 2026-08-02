@@ -102,13 +102,16 @@ def stats(db: Session = Depends(get_db)):
             driver_counts[t.exception_type] = driver_counts.get(t.exception_type, 0) + 1
     top_drivers = [{"type": k, "count": v} for k, v in sorted(driver_counts.items(), key=lambda x: x[1], reverse=True)[:5]]
 
-    # Recent Exceptions
+    # Recent Exceptions — expose narrative (clean AI text) as the display field
     recent_exceptions = [{
         "id": f"TCK-{t.id}",
         "type": t.exception_type,
-        "narrative": t.narrative,
+        "narrative": t.narrative,  # already the AI-cleaned narrative
         "created_at": t.created_at.isoformat() if t.created_at else None
     } for t in sorted(tickets, key=lambda x: x.created_at or dt.datetime.min, reverse=True)[:5]]
+
+    # Vendor count for dashboard summary string
+    unique_vendors = len(set(inv.vendor_name for inv in invoices if inv.vendor_name))
 
     return {
         "itcAtRiskInr": itc_res["itc_at_risk"],
@@ -120,6 +123,7 @@ def stats(db: Session = Depends(get_db)):
         "aiCallsAvoided": max(0, avoided_count),
         "topDrivers": top_drivers,
         "recentExceptions": recent_exceptions,
+        "uniqueVendors": unique_vendors,
     }
 
 
@@ -133,6 +137,58 @@ def risk_distribution(db: Session = Depends(get_db)):
         ).scalar() or 0
         result.append({"bucket": f"{lo}-{hi}", "count": count})
     return result
+
+
+@router.get("/stats/exception-breakdown")
+def exception_breakdown(db: Session = Depends(get_db)):
+    """Per exception_type: ticket count + total financial exposure (sum of invoice amounts)."""
+    all_tickets = db.query(Ticket).all()
+    breakdown = {}
+    for t in all_tickets:
+        key = t.exception_type or "unknown"
+        if key not in breakdown:
+            breakdown[key] = {"type": key, "count": 0, "exposure": 0.0}
+        breakdown[key]["count"] += 1
+        inv = db.query(Invoice).filter(Invoice.id == t.invoice_id).first()
+        if inv and inv.total_amount:
+            breakdown[key]["exposure"] += float(inv.total_amount)
+    result = sorted(breakdown.values(), key=lambda x: x["count"], reverse=True)
+    return result
+
+
+@router.get("/stats/flags-over-time")
+def flags_over_time(db: Session = Depends(get_db)):
+    """Weekly flag counts grouped by invoice date. Only returned if date spread >= 14 days."""
+    invoices = db.query(Invoice).filter(Invoice.invoice_date.isnot(None)).all()
+    if not invoices:
+        return {"supported": False, "reason": "No dated invoices in dataset"}
+
+    dates = [inv.invoice_date for inv in invoices if inv.invoice_date]
+    if not dates:
+        return {"supported": False, "reason": "No invoice dates found"}
+
+    date_min = min(d.date() if hasattr(d, 'date') else d for d in dates)
+    date_max = max(d.date() if hasattr(d, 'date') else d for d in dates)
+    spread_days = (date_max - date_min).days
+
+    if spread_days < 14:
+        return {"supported": False, "reason": f"Date spread only {spread_days} days — too narrow for a meaningful trend chart"}
+
+    # Build weekly buckets
+    import datetime as dt_mod
+    from collections import defaultdict
+    weekly = defaultdict(int)
+    for inv in invoices:
+        if not inv.invoice_date:
+            continue
+        d = inv.invoice_date.date() if hasattr(inv.invoice_date, 'date') else inv.invoice_date
+        # ISO week string: e.g. "2026-W23"
+        week_key = d.strftime("%Y-W%V")
+        tickets = db.query(Ticket).filter(Ticket.invoice_id == inv.id).all()
+        weekly[week_key] += len(tickets)
+
+    series = sorted([{"week": k, "flags": v} for k, v in weekly.items()], key=lambda x: x["week"])
+    return {"supported": True, "series": series, "spread_days": spread_days}
 
 @router.get("/folders")
 def get_folders(db: Session = Depends(get_db)):
@@ -323,7 +379,16 @@ def invoice_detail(invoice_id: str, db: Session = Depends(get_db)):
         "flags": [
             {
                 "type": t.exception_type,
+                # 'detail' = the AI-generated clean narrative (what we show by default)
                 "detail": t.narrative,
+                # 'rawReason' = the raw rule-engine reason string (shown in "Show technical detail" toggle)
+                # narrative IS the fallback to reason in narrative_generator.py line 73,
+                # so we attempt to pull the original reason from history if available;
+                # otherwise expose narrative as both (still cleaner than nothing)
+                "rawReason": (
+                    (t.history[-1].get("reason") if t.history else None)
+                    or t.narrative
+                ),
                 "status": t.status,
                 "msmeNarrative": getattr(t, "msme_narrative", None) or get_msme_fallback(t.exception_type, t.narrative),
                 "evidenceData": getattr(t, "evidence_data", None)

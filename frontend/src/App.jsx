@@ -55,8 +55,9 @@ function Shell({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Dark-navy header — uses border-b as depth cue, NOT box-shadow (see index.css) */}
       <header className="border-b border-ink-600 bg-ink sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-3">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div className="stamp-badge w-9 h-9 text-stamp-red text-[9px] font-mono font-bold flex items-center justify-center">
               IRS
@@ -78,10 +79,10 @@ function Shell({ children }) {
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) =>
-                  "px-3 py-1.5 text-sm rounded-md font-medium transition-colors " +
+                  "px-3 py-2 text-sm rounded-lg font-medium transition-all duration-150 " +
                   (isActive
-                    ? "bg-paper text-ink"
-                    : "text-paper/70 hover:text-paper hover:bg-ink-700")
+                    ? "bg-paper text-ink shadow-sm"
+                    : "text-paper/70 hover:text-paper hover:bg-ink-700 active:scale-[0.97]")
                 }
               >
                 {item.label}
@@ -95,7 +96,9 @@ function Shell({ children }) {
               <button
                 onClick={handleReset}
                 disabled={resetting}
-                className="text-xs font-mono px-2.5 py-1 rounded bg-ink-700 hover:bg-stamp-red/20 text-paper/80 hover:text-stamp-red border border-ink-600 transition-colors"
+                className="text-xs font-mono px-3 py-1.5 rounded-lg bg-ink-700 hover:bg-stamp-red/20
+                           text-paper/80 hover:text-stamp-red border border-ink-600 transition-all duration-150
+                           active:scale-[0.97] disabled:opacity-50"
                 title="Dev Tool: Wipe Invoice and Ticket tables"
               >
                 {resetMsg || (resetting ? "Resetting..." : "Reset demo data")}
@@ -112,7 +115,8 @@ function Shell({ children }) {
               </span>
               <button
                 onClick={logout}
-                className="text-xs font-mono text-paper/50 hover:text-paper/80 transition-colors px-2 py-1 rounded hover:bg-ink-700"
+                className="text-xs font-mono text-paper/50 hover:text-paper/80 transition-all duration-150
+                           px-2 py-1 rounded-lg hover:bg-ink-700 active:scale-[0.97]"
                 title="Switch role"
               >
                 Switch ↩
@@ -122,6 +126,7 @@ function Shell({ children }) {
         </div>
       </header>
 
+      {/* 8px spacing grid: py-8 = 32px, px-6 = 24px */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8">{children}</main>
 
       <footer className="border-t border-ink-600 py-4">

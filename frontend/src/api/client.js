@@ -144,6 +144,30 @@ export async function fetchRiskDistribution() {
   return data;
 }
 
+export async function fetchExceptionBreakdown() {
+  if (USE_MOCK) {
+    await delay();
+    return [
+      { type: "duplicate_invoice", count: 8, exposure: 420000 },
+      { type: "invalid_gstin", count: 6, exposure: 180000 },
+      { type: "amount_mismatch", count: 4, exposure: 95000 },
+      { type: "phantom_vendor", count: 3, exposure: 310000 },
+      { type: "benford_deviation", count: 2, exposure: 520000 },
+    ];
+  }
+  const { data } = await client.get("/stats/exception-breakdown");
+  return data;
+}
+
+export async function fetchFlagsOverTime() {
+  if (USE_MOCK) {
+    await delay();
+    return { supported: false, reason: "Mock mode" };
+  }
+  const { data } = await client.get("/stats/flags-over-time");
+  return data;
+}
+
 export async function fetchFolders() {
   if (USE_MOCK) {
     await delay();

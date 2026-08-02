@@ -10,14 +10,44 @@ body {
   background-color: #1B2430;
 }
 
-/* subtle paper grain on card surfaces */
+/* =====================================================================
+   ELEVATION SYSTEM
+   Material Design elevation applied ONLY to cream (.paper-surface) cards.
+   Dark-navy chrome (header, nav) uses border-b depth cue instead — 
+   box-shadow on a dark background reads as a halo, not depth.
+   ===================================================================== */
+
+/* Level 1 — resting state for all paper-surface cards */
 .paper-surface {
   background-color: #F6F1E4;
   background-image: radial-gradient(circle at 1px 1px, rgba(27,36,48,0.05) 1px, transparent 0);
   background-size: 5px 5px;
+  box-shadow: 0 1px 3px rgba(27,36,48,0.10), 0 1px 2px rgba(27,36,48,0.06);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-/* signature element: a rotated rubber-stamp badge for risk score */
+/* Level 2 — hovered state (lift effect) */
+.paper-surface:hover {
+  box-shadow: 0 4px 10px rgba(27,36,48,0.13), 0 2px 4px rgba(27,36,48,0.08);
+}
+
+/* Level 3 — active/modal surfaces (applied via class, not :active on the surface itself) */
+.elev-3 {
+  box-shadow: 0 8px 20px rgba(27,36,48,0.16), 0 4px 8px rgba(27,36,48,0.10);
+}
+
+/* =====================================================================
+   SPACING GRID
+   8px base grid. Use these values consistently:
+   p-2 (8px) · p-4 (16px) · p-6 (24px) · p-8 (32px)
+   gap-2 · gap-4 · gap-6 · gap-8
+   Never use p-3.5, p-2.5, p-5 etc. as the primary spacing value.
+   (Tailwind's fraction classes are still OK for fine-tuned micro-spacing.)
+   ===================================================================== */
+
+/* =====================================================================
+   SIGNATURE STAMP BADGE — rotated rubber-stamp risk score indicator
+   ===================================================================== */
 .stamp-badge {
   border: 2.5px solid currentColor;
   border-radius: 9999px;
@@ -34,11 +64,41 @@ body {
   opacity: 0.55;
 }
 
+/* =====================================================================
+   INTERACTIVE STATES
+   Consistent hover/focus/active treatment across all interactive surfaces.
+   ===================================================================== */
+
+/* Global focus ring — stamp-amber for brand consistency */
 :focus-visible {
   outline: 2px solid #C8922A;
   outline-offset: 2px;
 }
 
+/* Primary action buttons — micro-press feedback */
+button:not(:disabled):active,
+a[role="button"]:active {
+  transform: scale(0.97);
+}
+
+/* Clickable rows in dark surfaces (exception queue groups, folder rows) */
+.clickable-row {
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.clickable-row:hover {
+  background-color: rgba(60, 76, 97, 0.15);
+}
+
+/* =====================================================================
+   SCROLLBAR STYLING
+   ===================================================================== */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-thumb { background: #3C4C61; border-radius: 8px; }
+::-webkit-scrollbar-track { background: #232E3D; }
+
+/* =====================================================================
+   REDUCED MOTION
+   ===================================================================== */
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;
@@ -46,7 +106,3 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
-
-::-webkit-scrollbar { width: 10px; }
-::-webkit-scrollbar-thumb { background: #3C4C61; border-radius: 8px; }
-::-webkit-scrollbar-track { background: #232E3D; }

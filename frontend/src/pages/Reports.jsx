@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { generateReport } from "../api/client.js";
 import { useMode } from "../context/ModeContext.jsx";
+import { fmtCurrency, sanitiseReason } from "../utils/format.js";
 
 const EXCEPTION_TYPES = [
   "duplicate_invoice",
@@ -63,7 +64,7 @@ export default function Reports() {
         </p>
       </div>
 
-      <form onSubmit={handleGenerate} className="paper-surface rounded-lg p-6 text-ink space-y-5">
+      <form onSubmit={handleGenerate} className="paper-surface rounded-xl p-6 text-ink space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="block text-sm font-semibold text-ink">
             From
@@ -122,7 +123,9 @@ export default function Reports() {
           <button
             type="submit"
             disabled={generating}
-            className="bg-stamp-red text-paper px-5 py-2.5 rounded-md text-sm font-medium disabled:opacity-50 hover:bg-stamp-red/90 transition shadow"
+            className="bg-stamp-red text-paper px-5 py-2.5 rounded-lg text-sm font-medium
+                       disabled:opacity-50 hover:bg-stamp-red/90 active:scale-[0.97]
+                       transition-all duration-150 shadow-elev-1"
           >
             {generating ? "Running portfolio analysis…" : "Generate report"}
           </button>
@@ -172,7 +175,7 @@ export default function Reports() {
                 {result.insufficient_data_notes.map((note, i) => (
                   <li key={i} className="flex items-start gap-2">
                     <span className="text-stamp-amber shrink-0">•</span>
-                    <span>{note.message}</span>
+                    <span>{sanitiseReason(note.message)}</span>
                   </li>
                 ))}
               </ul>
@@ -182,7 +185,7 @@ export default function Reports() {
 
           {/* Flagged Invoices Breakdown */}
           {result.flagged_invoices?.length > 0 && (
-            <div className="paper-surface rounded-lg p-6 text-ink space-y-4">
+            <div className="paper-surface rounded-xl p-6 text-ink space-y-4 active:scale-[0.995] transition-transform">
               <h4 className="font-display text-lg font-semibold text-ink">Flagged Invoice Portfolio Detail</h4>
               <div className="space-y-3">
                 {result.flagged_invoices.map((inv) => (
@@ -193,7 +196,7 @@ export default function Reports() {
                         <span className="text-xs font-mono text-ink-700 font-medium">{inv.vendor_name} ({inv.vendor_gstin})</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="font-mono text-sm font-bold text-ink">₹{Number(inv.total_amount || 0).toFixed(2)}</span>
+                        <span className="font-mono text-sm font-bold text-ink">{fmtCurrency(inv.total_amount)}</span>
                         <span className="stamp-badge text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-stamp-red/10 text-stamp-red border border-stamp-red/30">
                           Score: {inv.risk_score}
                         </span>

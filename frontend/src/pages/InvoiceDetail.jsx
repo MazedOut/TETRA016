@@ -3,6 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { fetchInvoiceDetail, patchInvoice } from "../api/client.js";
 import ResolutionForm from "../components/ResolutionForm.jsx";
 import VendorCorrectionForm from "../components/VendorCorrectionForm.jsx";
+import FindingRow from "../components/FindingRow.jsx";
+import { fmtCurrency, fmtPct, sanitiseReason } from "../utils/format.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const EXCEPTION_TITLES = {
@@ -80,7 +82,7 @@ function EditFieldsPanel({ invoice, onSaved, onClose }) {
   }
 
   return (
-    <div className="paper-surface rounded-lg p-6 text-ink space-y-4 border-2 border-stamp-amber/40">
+    <div className="paper-surface rounded-xl p-6 text-ink space-y-4 border-2 border-stamp-amber/40">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-display text-lg font-semibold">Edit Extracted Fields</h3>
@@ -124,14 +126,17 @@ function EditFieldsPanel({ invoice, onSaved, onClose }) {
           <button
             type="submit"
             disabled={saving || saved}
-            className="bg-stamp-amber text-ink px-5 py-2 rounded-md text-sm font-semibold hover:bg-stamp-amber/90 disabled:opacity-50 transition-colors"
+            className="bg-stamp-amber text-ink px-5 py-2 rounded-lg text-sm font-semibold
+                       hover:bg-stamp-amber/90 active:scale-[0.97] disabled:opacity-50
+                       transition-all duration-150"
           >
             {saved ? "✓ Saved" : saving ? "Saving…" : "Save corrections"}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-md text-sm font-medium text-ink-600 hover:text-ink hover:bg-ink/5 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-ink-600
+                       hover:text-ink hover:bg-ink/5 active:scale-[0.97] transition-all duration-150"
           >
             Cancel
           </button>
@@ -255,7 +260,8 @@ export default function InvoiceDetail() {
           )}
           <a
             href={buildDisputeMailto(invoice)}
-            className="bg-ink-700 border border-ink-600 text-paper px-4 py-2 rounded-md text-sm font-medium hover:bg-ink-600 transition-colors"
+            className="bg-ink-700 border border-ink-600 text-paper px-4 py-2 rounded-lg text-sm font-medium
+                       hover:bg-ink-600 active:scale-[0.97] transition-all duration-150"
           >
             Draft dispute email
           </a>
@@ -274,7 +280,9 @@ export default function InvoiceDetail() {
               <button
                 onClick={() => setShowResolve(true)}
                 disabled={resolved}
-                className="bg-stamp-red text-paper px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 hover:bg-stamp-red/90 transition-colors"
+                className="bg-stamp-red text-paper px-4 py-2 rounded-lg text-sm font-medium
+                           disabled:opacity-50 hover:bg-stamp-red/90 active:scale-[0.97]
+                           transition-all duration-150"
               >
                 {resolved ? "Resolved ✓" : "Resolve ticket"}
               </button>
@@ -313,7 +321,10 @@ export default function InvoiceDetail() {
             <span>🤖</span> AI Risk Brief
           </h3>
           <p className="text-sm font-sans leading-relaxed text-paper/90">
-            {invoice.flags.map(f => (mode === "msme" ? f.msmeNarrative : f.detail)).filter(Boolean).join(" ")}
+            {invoice.flags
+              .map(f => (mode === "msme" ? f.msmeNarrative : f.detail))
+              .filter(Boolean)
+              .join(" ")}
           </p>
         </div>
       )}
@@ -321,7 +332,7 @@ export default function InvoiceDetail() {
       {/* Main content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Document Viewer */}
-        <div className="paper-surface rounded-lg p-4 text-ink min-h-[460px] flex flex-col items-center justify-center">
+        <div className="paper-surface rounded-xl p-4 text-ink min-h-[460px] flex flex-col items-center justify-center">
           {invoice.fileUrl ? (
             <iframe
               src={invoice.fileUrl}
@@ -337,7 +348,7 @@ export default function InvoiceDetail() {
         </div>
 
         {/* Extracted Fields & Flags */}
-        <div className="paper-surface rounded-lg p-6 text-ink space-y-5">
+        <div className="paper-surface rounded-xl p-6 text-ink space-y-5">
           <div className="flex items-baseline justify-between">
             <h3 className="font-display text-lg font-semibold">Extracted fields</h3>
             {canWrite && (
@@ -394,32 +405,18 @@ export default function InvoiceDetail() {
                 Evidence Chain ({mode === "msme" ? "MSME Plain Language" : "Auditor View"})
               </p>
               <div className="relative border-l border-stamp-red/30 ml-2 space-y-6">
-                {invoice.flags.map((f, i) => {
-                  const title = mode === "msme" ? (EXCEPTION_TITLES[f.type] || f.type) : f.type;
-                  const narrative = mode === "msme" ? (f.msmeNarrative || f.detail) : f.detail;
-                  return (
-                    <div key={i} className="relative pl-6">
-                      <div className="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-stamp-red border-2 border-paper" />
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="font-mono font-semibold text-sm text-stamp-red">{title}</span>
-                        {f.status && (
-                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full border ${STATUS_STYLES[f.status] ?? ""}`}>
-                            {f.status}
-                          </span>
-                        )}
-                        {f.evidenceData?.duplicate_invoice_id && (
-                          <Link
-                            to={`/invoices/${invoice.id}/compare/${f.evidenceData.duplicate_invoice_id}`}
-                            className="text-[10px] ml-2 font-mono px-2 py-0.5 rounded-full bg-stamp-amber text-ink font-bold hover:brightness-110"
-                          >
-                            COMPARE TARGET ↗
-                          </Link>
-                        )}
-                      </div>
-                      <p className="text-xs text-ink leading-relaxed font-sans">{narrative}</p>
-                    </div>
-                  );
-                })}
+                {invoice.flags.map((f, i) => (
+                  <FindingRow key={i} flag={f} mode={mode}>
+                    {f.evidenceData?.duplicate_invoice_id && (
+                      <Link
+                        to={`/invoices/${invoice.id}/compare/${f.evidenceData.duplicate_invoice_id}`}
+                        className="text-[10px] ml-2 font-mono px-2 py-0.5 rounded-full bg-stamp-amber text-ink font-bold hover:brightness-110"
+                      >
+                        COMPARE TARGET ↗
+                      </Link>
+                    )}
+                  </FindingRow>
+                ))}
               </div>
             </div>
           )}
