@@ -80,6 +80,28 @@ Risk Score (fraud likelihood) and Confidence Score (extraction certainty) are tr
 
 ---
 
+## Architecture
+
+<img width="1520" height="1520" alt="image" src="https://github.com/user-attachments/assets/6ff7fbad-c62e-44a9-b67a-1b777154101b" />
+
+
+TETRA ingests invoices through a React (Vite + Tailwind) frontend, which talks to a
+FastAPI backend over REST. The backend orchestrator runs each invoice through a
+seven-stage pipeline:
+
+1. **Ingestion** – batch handler, file validation, content sniffing
+2. **Extraction** – PaddleOCR / Tesseract, with Gemini as a fallback for low-confidence scans
+3. **Classification** – vendor classifier, folder sorter, misfile scanner
+4. **Reconciliation** – GSTIN validation, duplicate detection, ledger matching, Benford's law checks
+5. **Scoring** – risk scorer, ITC calculator, MSME late-payment penalty
+6. **AI layer** – Gemini-powered narrative generation and MSME-friendly translations
+7. **Audit trail** – ticket creation, SHA-256 hash sealing, immutable history log
+
+Results are persisted via SQLAlchemy to **SQLite** (swappable to Postgres via
+`DATABASE_URL`), and reports are exported as PDFs using ReportLab / WeasyPrint.
+Synthetic invoice, ledger, and vendor-master data generators seed the system for demos.
+
+---
 ## Project Structure
 
 ```text
