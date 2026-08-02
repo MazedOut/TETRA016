@@ -280,4 +280,22 @@ export async function fetchFolderInvoices(folderName) {
   return data;
 }
 
+// ==================== CRYPTOGRAPHIC SEAL ====================
+export async function verifySeal(invoiceId) {
+  const { data } = await client.post(`/invoices/${invoiceId}/verify-seal`);
+  return data;
+}
+
+// ==================== FORENSIC METADATA ====================
+export async function fetchForensics(invoiceId) {
+  const { data } = await client.get(`/invoices/${invoiceId}/forensics`);
+  return data;
+}
+
+// ==================== AUDIT TRAIL ====================
+export async function fetchAuditTrail(invoiceId) {
+  const { data } = await client.get(`/invoices/${invoiceId}/audit-trail`);
+  return data;
+}
+
 export default client;

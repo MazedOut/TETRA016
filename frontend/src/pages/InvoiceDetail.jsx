@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { fetchInvoiceDetail, patchInvoice } from "../api/client.js";
+import { fetchInvoiceDetail, patchInvoice, verifySeal, fetchForensics, fetchAuditTrail } from "../api/client.js";
 import ResolutionForm from "../components/ResolutionForm.jsx";
 import VendorCorrectionForm from "../components/VendorCorrectionForm.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -181,10 +181,42 @@ export default function InvoiceDetail() {
   const [showVendorCorrect, setShowVendorCorrect] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [resolved, setResolved] = useState(false);
+  const [sealStatus, setSealStatus] = useState(null);
+  const [sealData, setSealData] = useState(null);
+  const [forensics, setForensics] = useState(null);
+  const [auditTrail, setAuditTrail] = useState(null);
+  const [showAuditPanel, setShowAuditPanel] = useState(false);
+  const [auditFilter, setAuditFilter] = useState('all');
 
   useEffect(() => {
-    fetchInvoiceDetail(id).then(setInvoice);
+    fetchInvoiceDetail(id).then((inv) => {
+      setInvoice(inv);
+      fetchForensics(id).then(setForensics).catch(() => {});
+    });
   }, [id]);
+
+  async function handleVerifySeal() {
+    setSealStatus('loading');
+    try {
+      const result = await verifySeal(invoice.id);
+      setSealData(result);
+      setSealStatus(result.valid ? 'valid' : 'invalid');
+    } catch {
+      setSealStatus('invalid');
+    }
+  }
+
+  async function handleOpenAuditTrail() {
+    setShowAuditPanel(true);
+    if (!auditTrail) {
+      try {
+        const result = await fetchAuditTrail(invoice.id);
+        setAuditTrail(result.events || []);
+      } catch {
+        setAuditTrail([]);
+      }
+    }
+  }
 
   if (!invoice) return <p className="text-sm text-paper/60 p-6">Loading invoice…</p>;
 
@@ -259,6 +291,12 @@ export default function InvoiceDetail() {
           >
             Draft dispute email
           </a>
+          <button
+            onClick={handleOpenAuditTrail}
+            className="bg-ink-700 border border-ink-600 text-paper px-4 py-2 rounded-md text-sm font-medium hover:bg-ink-600 transition-colors"
+          >
+            📜 Audit Trail
+          </button>
           {canWrite && (
             <>
               <button
@@ -287,6 +325,120 @@ export default function InvoiceDetail() {
           )}
         </div>
       </div>
+
+      {/* ═══ Cryptographic Seal Badge ═══ */}
+      {invoice.seal && (
+        <div className={`rounded-lg p-4 border-2 flex items-center justify-between flex-wrap gap-3 transition-all duration-500 ${
+          sealStatus === 'valid' ? 'bg-stamp-green/10 border-stamp-green/40' :
+          sealStatus === 'invalid' ? 'bg-stamp-red/10 border-stamp-red/40' :
+          'bg-ink-700 border-ink-600/40'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${
+              sealStatus === 'valid' ? 'bg-stamp-green/20 text-stamp-green' :
+              sealStatus === 'invalid' ? 'bg-stamp-red/20 text-stamp-red' :
+              'bg-ink-600 text-paper/60'
+            }`}>
+              {sealStatus === 'valid' ? '🔒' : sealStatus === 'invalid' ? '🔓' : '🛡️'}
+            </div>
+            <div>
+              <h4 className="text-xs uppercase tracking-widest font-mono font-bold text-paper/60">
+                Cryptographic Seal
+                {sealStatus === 'valid' && <span className="ml-2 text-stamp-green">VERIFIED ✓</span>}
+                {sealStatus === 'invalid' && <span className="ml-2 text-stamp-red">TAMPERED ✗</span>}
+              </h4>
+              <p className="text-xs font-mono text-paper/40 mt-0.5">
+                {invoice.seal.algorithm} · Sealed {invoice.seal.sealed_at ? new Date(invoice.seal.sealed_at).toLocaleString() : 'N/A'}
+              </p>
+              <p className="text-[11px] font-mono text-paper/30 mt-0.5 break-all">
+                {invoice.seal.hash}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleVerifySeal}
+            disabled={sealStatus === 'loading'}
+            className={`px-4 py-2 rounded-md text-sm font-medium font-mono transition-all ${
+              sealStatus === 'loading' ? 'bg-ink-600 text-paper/50 cursor-wait' :
+              sealStatus === 'valid' ? 'bg-stamp-green/20 text-stamp-green border border-stamp-green/40 hover:bg-stamp-green/30' :
+              sealStatus === 'invalid' ? 'bg-stamp-red/20 text-stamp-red border border-stamp-red/40 hover:bg-stamp-red/30' :
+              'bg-paper text-ink hover:bg-paper-dim border border-ink-600/30'
+            }`}
+          >
+            {sealStatus === 'loading' ? '⏳ Verifying…' :
+             sealStatus === 'valid' ? '✅ Seal Intact' :
+             sealStatus === 'invalid' ? '🔄 Re-verify' :
+             '🔐 Verify Seal'}
+          </button>
+        </div>
+      )}
+
+      {/* ═══ Forensic Metadata Analysis ═══ */}
+      {forensics && (forensics.producer || forensics.creator || forensics.software_flags?.length > 0 || forensics.date_anomalies?.length > 0) && (
+        <div className="bg-ink-800 rounded-lg border border-ink-600/30 p-5 space-y-4">
+          <h3 className="text-xs uppercase tracking-widest font-mono text-paper/50 font-bold flex items-center gap-2">
+            <span>🔬</span> Forensic Metadata Analysis
+            {forensics.software_flags?.length > 0 && (
+              <span className="ml-2 px-2 py-0.5 rounded-full bg-stamp-red/20 text-stamp-red border border-stamp-red/30 text-[10px]">
+                {forensics.software_flags.length} alert{forensics.software_flags.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </h3>
+
+          {/* Software warnings */}
+          {forensics.software_flags?.map((flag, i) => (
+            <div key={i} className="bg-stamp-red/10 border border-stamp-red/30 rounded-md px-4 py-3 flex items-start gap-3">
+              <span className="text-stamp-red text-lg shrink-0">⚠️</span>
+              <div>
+                <p className="text-sm font-semibold text-stamp-red">{flag.message}</p>
+                <p className="text-xs text-paper/50 font-mono mt-0.5">
+                  Detected in: {flag.detected_in || 'metadata'} · Severity: {flag.severity?.toUpperCase()}
+                </p>
+              </div>
+            </div>
+          ))}
+
+          {/* Date anomalies */}
+          {forensics.date_anomalies?.map((anomaly, i) => (
+            <div key={i} className="bg-stamp-amber/10 border border-stamp-amber/30 rounded-md px-4 py-3 flex items-start gap-3">
+              <span className="text-stamp-amber text-lg shrink-0">📅</span>
+              <div>
+                <p className="text-sm font-semibold text-stamp-amber">{anomaly.message}</p>
+                <p className="text-xs text-paper/50 font-mono mt-0.5">Severity: {anomaly.severity?.toUpperCase()}</p>
+              </div>
+            </div>
+          ))}
+
+          {/* Metadata grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              ['Producer', forensics.producer],
+              ['Creator', forensics.creator],
+              ['OS / Platform', forensics.os_platform],
+              ['Pages', forensics.page_count],
+              ['Created', forensics.creation_date],
+              ['Modified', forensics.modification_date],
+              ['File Size', forensics.file_size_bytes ? `${(forensics.file_size_bytes / 1024).toFixed(1)} KB` : null],
+              ['Risk Contribution', forensics.risk_score_contribution ? `+${forensics.risk_score_contribution} pts` : '0'],
+            ].map(([label, value]) => (
+              <div key={label} className="bg-ink-700/50 rounded-md px-3 py-2">
+                <p className="text-[10px] uppercase tracking-wider text-paper/40 font-mono">{label}</p>
+                <p className="text-sm font-mono text-paper/80 mt-0.5 truncate" title={value || '—'}>
+                  {value || <span className="text-paper/30 italic">N/A</span>}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Clean indicator */}
+          {forensics.software_flags?.length === 0 && forensics.date_anomalies?.length === 0 && (
+            <div className="bg-stamp-green/10 border border-stamp-green/30 rounded-md px-4 py-2.5 flex items-center gap-2 text-sm">
+              <span className="text-stamp-green">✅</span>
+              <span className="text-stamp-green font-medium">No forensic anomalies detected — document metadata appears clean</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Edit form (Auditor only) */}
       {showEdit && canWrite && (
@@ -448,6 +600,116 @@ export default function InvoiceDetail() {
             setInvoice((prev) => ({ ...prev, vendor, gstin }))
           }
         />
+      )}
+
+      {/* ═══ Audit Trail Slide-out Panel ═══ */}
+      {showAuditPanel && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-ink/60 z-40 transition-opacity"
+            onClick={() => setShowAuditPanel(false)}
+          />
+          {/* Panel */}
+          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-ink-800 border-l border-ink-600 z-50 flex flex-col shadow-2xl animate-slideIn">
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-ink-600/40">
+              <div>
+                <h3 className="font-display text-lg font-semibold text-paper">Audit Trail</h3>
+                <p className="text-xs font-mono text-paper/40 mt-0.5">
+                  {invoice.id} · {auditTrail?.length || 0} events
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAuditPanel(false)}
+                className="text-paper/50 hover:text-paper text-xl leading-none px-2 py-1 rounded hover:bg-ink-700 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Filter bar */}
+            <div className="px-5 py-3 border-b border-ink-600/20 flex gap-1.5 flex-wrap">
+              {['all', 'pipeline', 'validation', 'forensics', 'scoring', 'ai', 'security', 'audit'].map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setAuditFilter(cat)}
+                  className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors ${
+                    auditFilter === cat
+                      ? 'bg-paper text-ink font-semibold'
+                      : 'text-paper/50 hover:text-paper hover:bg-ink-700'
+                  }`}
+                >
+                  {cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {/* Timeline */}
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {!auditTrail ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="w-6 h-6 border-2 border-paper/30 border-t-paper rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="relative">
+                  {/* Vertical line */}
+                  <div className="absolute left-4 top-2 bottom-2 w-px bg-ink-600/40" />
+
+                  <div className="space-y-1">
+                    {auditTrail
+                      .filter(e => auditFilter === 'all' || e.category === auditFilter)
+                      .map((event, i) => {
+                        const time = event.timestamp
+                          ? new Date(event.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                          : '';
+                        const date = event.timestamp
+                          ? new Date(event.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+                          : '';
+
+                        const categoryColor = {
+                          pipeline: 'border-paper/30 text-paper/70',
+                          validation: 'border-stamp-amber/50 text-stamp-amber',
+                          forensics: 'border-stamp-red/50 text-stamp-red',
+                          scoring: 'border-paper/30 text-paper/70',
+                          ai: 'border-stamp-amber/50 text-stamp-amber',
+                          security: 'border-stamp-green/50 text-stamp-green',
+                          audit: 'border-paper/30 text-paper/70',
+                        }[event.category] || 'border-paper/30 text-paper/70';
+
+                        return (
+                          <div key={i} className="relative pl-10 py-2.5 group">
+                            {/* Timeline dot */}
+                            <div className={`absolute left-2.5 top-3.5 w-3 h-3 rounded-full border-2 bg-ink-800 ${categoryColor} group-hover:scale-125 transition-transform`} />
+
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm">{event.icon}</span>
+                                  <span className="text-sm font-semibold text-paper">{event.label}</span>
+                                </div>
+                                {event.detail && (
+                                  <p className="text-xs text-paper/50 font-mono mt-0.5 break-words">{event.detail}</p>
+                                )}
+                                <p className="text-[10px] text-paper/30 font-mono mt-0.5">
+                                  {event.actor !== 'system' && <span className="text-stamp-amber">{event.actor} · </span>}
+                                  {date} {time}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                    {auditTrail.filter(e => auditFilter === 'all' || e.category === auditFilter).length === 0 && (
+                      <p className="text-center text-paper/40 text-sm font-mono py-8">No events for this filter</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

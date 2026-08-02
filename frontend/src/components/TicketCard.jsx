@@ -85,6 +85,18 @@ export default function TicketCard({ ticket, selected, onToggleSelect }) {
           <p className="text-sm font-medium mt-0.5">{ticket.vendor}</p>
           <p className="text-xs font-mono font-semibold text-ink-600 mt-1">{displayFlag}</p>
 
+          {/* Forensic alert badge — only for metadata/tamper flags */}
+          {(ticket.flag === "pdf_metadata_tamper" || ticket.flag === "invisible_text_detected") && (
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-stamp-red/20 text-stamp-red border border-stamp-red/30 animate-pulse">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                {ticket.flag === "pdf_metadata_tamper" ? "🔬 Forensic Alert" : "👻 Hidden Text"}
+              </span>
+            </div>
+          )}
+
           {displayNarrative && (
             <p className={"text-xs mt-1.5 p-2 rounded border font-sans leading-relaxed " + (mode === "msme" ? "bg-stamp-amber/10 border-stamp-amber/30 text-ink" : "bg-ink/5 border-ink-600/10 text-ink-700")}>
               <span className="font-semibold text-[10px] uppercase font-mono tracking-wider block mb-0.5 text-ink-600">
