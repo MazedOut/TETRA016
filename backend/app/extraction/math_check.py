@@ -12,6 +12,6 @@ def check(fields: dict) -> tuple[bool, str]:
         tax = sum(_num(fields.get(t)) for t in ("cgst", "sgst", "igst"))
         if abs((taxable + tax) - total) < 0.5:
             return True, ""
-        return False, f"mismatch: {taxable}+{tax} != {total}"
+        return False, f"mismatch: ₹{taxable:.2f} + ₹{tax:.2f} != ₹{total:.2f}"
     except (TypeError, ValueError) as e:
         return False, f"non-numeric fields, cannot verify: {e}"

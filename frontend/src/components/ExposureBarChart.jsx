@@ -62,38 +62,40 @@ export default function ExposureBarChart({ data = [] }) {
     }));
 
   return (
-    <div className="paper-surface rounded-xl p-6 text-ink">
+    <div className="paper-surface rounded-xl p-6 text-ink flex flex-col h-full">
       <h3 className="font-display text-base font-semibold mb-1">Financial Exposure by Flag Type</h3>
       <p className="text-xs font-mono text-ink-600 mb-4">₹ at risk per exception category</p>
-      <ResponsiveContainer width="100%" height={240}>
-        <BarChart
-          data={sorted}
-          margin={{ left: 8, right: 8, top: 8, bottom: 32 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#EAE2CD" vertical={false} />
-          <XAxis
-            dataKey="label"
-            tick={{ fontFamily: "IBM Plex Mono", fontSize: 10, fill: "#1B2430" }}
-            angle={-30}
-            textAnchor="end"
-            interval={0}
-          />
-          <YAxis
-            tickFormatter={formatYAxis}
-            tick={{ fontFamily: "IBM Plex Mono", fontSize: 11, fill: "#3C4C61" }}
-            width={54}
-          />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(27,36,48,0.05)" }} />
-          <Bar dataKey="exposure" radius={[4, 4, 0, 0]}>
-            {sorted.map((entry, i) => (
-              <Cell
-                key={entry.type}
-                fill={i === 0 ? "#B23A2E" : i === 1 ? "#C8922A" : "#3C4C61"}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      <div className="flex-1 min-h-[240px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={sorted}
+            margin={{ left: 8, right: 8, top: 8, bottom: 32 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#EAE2CD" vertical={false} />
+            <XAxis
+              dataKey="label"
+              tick={{ fontFamily: "IBM Plex Mono", fontSize: 10, fill: "#1B2430" }}
+              angle={-30}
+              textAnchor="end"
+              interval={0}
+            />
+            <YAxis
+              tickFormatter={formatYAxis}
+              tick={{ fontFamily: "IBM Plex Mono", fontSize: 11, fill: "#3C4C61" }}
+              width={54}
+            />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(27,36,48,0.05)" }} />
+            <Bar dataKey="exposure" radius={[4, 4, 0, 0]}>
+              {sorted.map((entry, i) => (
+                <Cell
+                  key={entry.type}
+                  fill={i === 0 ? "#B23A2E" : i === 1 ? "#C8922A" : "#3C4C61"}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

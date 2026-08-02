@@ -64,29 +64,31 @@ export default function RiskDonut({ stats }) {
   }
 
   return (
-    <div className="paper-surface rounded-xl p-6 text-ink">
+    <div className="paper-surface rounded-xl p-6 text-ink flex flex-col h-full">
       <h3 className="font-display text-base font-semibold mb-1">Risk Level Distribution</h3>
       <p className="text-xs font-mono text-ink-600 mb-4">{total} invoices by risk tier</p>
-      <ResponsiveContainer width="100%" height={200}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={55}
-            outerRadius={80}
-            paddingAngle={3}
-            dataKey="value"
-            strokeWidth={0}
-          >
-            {data.map((entry) => (
-              <Cell key={entry.key} fill={RISK_COLORS[entry.key]} />
-            ))}
-          </Pie>
-          <Tooltip content={<CustomTooltip />} />
-          <Legend content={<CUSTOM_LEGEND />} />
-        </PieChart>
-      </ResponsiveContainer>
+      <div className="flex-1 min-h-[200px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={55}
+              outerRadius={80}
+              paddingAngle={3}
+              dataKey="value"
+              strokeWidth={0}
+            >
+              {data.map((entry) => (
+                <Cell key={entry.key} fill={RISK_COLORS[entry.key]} />
+              ))}
+            </Pie>
+            <Tooltip content={<CustomTooltip />} />
+            <Legend content={<CUSTOM_LEGEND />} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

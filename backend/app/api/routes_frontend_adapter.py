@@ -113,6 +113,12 @@ def stats(db: Session = Depends(get_db)):
     # Vendor count for dashboard summary string
     unique_vendors = len(set(inv.vendor_name for inv in invoices if inv.vendor_name))
 
+    by_risk_level = {"low": 0, "medium": 0, "high": 0}
+    for inv in invoices:
+        lvl = (inv.risk_level or "low").lower()
+        if lvl in by_risk_level:
+            by_risk_level[lvl] += 1
+
     return {
         "itcAtRiskInr": itc_res["itc_at_risk"],
         "invoicesProcessed": total,
@@ -124,6 +130,7 @@ def stats(db: Session = Depends(get_db)):
         "topDrivers": top_drivers,
         "recentExceptions": recent_exceptions,
         "uniqueVendors": unique_vendors,
+        "by_risk_level": by_risk_level,
     }
 
 

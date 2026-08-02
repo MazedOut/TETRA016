@@ -1,3 +1,5 @@
+import { fmtCurrency } from "../utils/format.js";
+
 /**
  * Top-of-dashboard summary metrics: ITC-at-risk, processed count, MSME penalty exposure, AI cost-savings.
  * Material elevation: elev-1 resting, elev-2 on hover (via .paper-surface CSS).
@@ -7,7 +9,7 @@ function Card({ eyebrow, value, sub, highlight }) {
   return (
     <div
       className={
-        "paper-surface rounded-xl p-5 text-ink flex flex-col justify-between gap-2 " +
+        "paper-surface rounded-xl p-6 text-ink flex flex-col justify-between gap-2 h-full " +
         "transition-all duration-150 hover:-translate-y-0.5 " +
         (highlight ? "border border-stamp-green/40 bg-stamp-green/5" : "")
       }
@@ -41,14 +43,14 @@ export default function StatsCards({ stats }) {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       <Card
         eyebrow="ITC at risk"
-        value={`₹${Number(stats.itcAtRiskInr || 0).toLocaleString("en-IN")}`}
+        value={fmtCurrency(stats.itcAtRiskInr)}
         sub="tax credit tied to high-risk invoices"
       />
       <Card eyebrow="Processed" value={stats.invoicesProcessed} sub="invoices total in database" />
       <Card eyebrow="Open tickets" value={stats.openTickets} sub="awaiting auditor review" />
       <Card
         eyebrow="MSME penalty exposure"
-        value={`₹${Number(stats.msmePenaltyExposureInr || 0).toLocaleString("en-IN")}`}
+        value={fmtCurrency(stats.msmePenaltyExposureInr)}
         sub="45-day MSME deadline risk"
       />
       <Card

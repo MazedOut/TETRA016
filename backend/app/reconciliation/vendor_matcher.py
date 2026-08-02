@@ -43,7 +43,7 @@ def match_vendor(invoice: dict, vendor_master: pd.DataFrame) -> dict:
         return {
             "flagged": True,
             "check": "typo_squatting_vendor",
-            "reason": f"Vendor name '{inv_name}' is {best_score}% similar to known vendor "
+            "reason": f"Vendor name '{inv_name}' is {best_score:.1f}% similar to known vendor "
                       f"'{best_match}' but GSTIN doesn't match — possible impersonation/typo-squatting.",
         }
 
@@ -52,5 +52,5 @@ def match_vendor(invoice: dict, vendor_master: pd.DataFrame) -> dict:
         "flagged": True,
         "check": "phantom_vendor",
         "reason": f"Vendor '{inv_name}' is not in the vendor master and has no close match "
-                  f"(best similarity: {best_score}% to '{best_match}') — unrecognized vendor.",
+                  f"(best similarity: {best_score:.1f}% to '{best_match}') — unrecognized vendor.",
     }

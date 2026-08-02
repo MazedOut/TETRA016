@@ -53,42 +53,44 @@ export default function ExceptionBarChart({ data = [] }) {
   const chartHeight = Math.max(180, sorted.length * 40);
 
   return (
-    <div className="paper-surface rounded-xl p-6 text-ink">
+    <div className="paper-surface rounded-xl p-6 text-ink flex flex-col h-full">
       <h3 className="font-display text-base font-semibold mb-1">Exception Type Frequency</h3>
       <p className="text-xs font-mono text-ink-600 mb-4">Flags fired across all tickets</p>
-      <ResponsiveContainer width="100%" height={chartHeight}>
-        <BarChart
-          data={sorted}
-          layout="vertical"
-          margin={{ left: 8, right: 24, top: 0, bottom: 0 }}
-        >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="#EAE2CD"
-            horizontal={false}
-          />
-          <XAxis
-            type="number"
-            tick={{ fontFamily: "IBM Plex Mono", fontSize: 11, fill: "#3C4C61" }}
-            allowDecimals={false}
-          />
-          <YAxis
-            type="category"
-            dataKey="label"
-            width={110}
-            tick={{ fontFamily: "IBM Plex Mono", fontSize: 11, fill: "#1B2430" }}
-          />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(27,36,48,0.05)" }} />
-          <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-            {sorted.map((entry, i) => (
-              <Cell
-                key={entry.type}
-                fill={i === 0 ? "#B23A2E" : i === 1 ? "#C8922A" : "#3C4C61"}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      <div className="flex-1" style={{ minHeight: chartHeight }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={sorted}
+            layout="vertical"
+            margin={{ left: 8, right: 24, top: 0, bottom: 0 }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#EAE2CD"
+              horizontal={false}
+            />
+            <XAxis
+              type="number"
+              tick={{ fontFamily: "IBM Plex Mono", fontSize: 11, fill: "#3C4C61" }}
+              allowDecimals={false}
+            />
+            <YAxis
+              type="category"
+              dataKey="label"
+              width={110}
+              tick={{ fontFamily: "IBM Plex Mono", fontSize: 11, fill: "#1B2430" }}
+            />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(27,36,48,0.05)" }} />
+            <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+              {sorted.map((entry, i) => (
+                <Cell
+                  key={entry.type}
+                  fill={i === 0 ? "#B23A2E" : i === 1 ? "#C8922A" : "#3C4C61"}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

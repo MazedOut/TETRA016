@@ -156,11 +156,11 @@ export default function Reports() {
               </div>
               <div className="bg-paper rounded p-3 text-center border border-ink-600/20 shadow-sm">
                 <span className="text-xs text-stamp-amber font-mono block font-bold">ITC at Risk</span>
-                <span className="font-display text-xl font-bold text-stamp-amber">₹{Number(result.itc_at_risk_inr || 0).toLocaleString("en-IN")}</span>
+                <span className="font-display text-xl font-bold text-stamp-amber">{fmtCurrency(result.itc_at_risk_inr)}</span>
               </div>
               <div className="bg-paper rounded p-3 text-center border border-ink-600/20 shadow-sm">
                 <span className="text-xs text-ink-700 font-mono block font-bold">MSME Penalty</span>
-                <span className="font-display text-xl font-bold text-ink">₹{Number(result.msme_penalty_exposure_inr || 0).toLocaleString("en-IN")}</span>
+                <span className="font-display text-xl font-bold text-ink">{fmtCurrency(result.msme_penalty_exposure_inr)}</span>
               </div>
             </div>
           </div>

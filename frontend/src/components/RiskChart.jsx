@@ -5,9 +5,10 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
  */
 export default function RiskChart({ data }) {
   return (
-    <div className="paper-surface rounded-lg p-6 text-ink">
+    <div className="paper-surface rounded-xl p-6 text-ink h-full flex flex-col">
       <h3 className="font-display text-lg font-semibold mb-4">Risk score distribution</h3>
-      <ResponsiveContainer width="100%" height={260}>
+      <div className="flex-1 min-h-[260px]">
+        <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data || []} margin={{ left: -20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#EAE2CD" />
           <XAxis dataKey="bucket" tick={{ fontFamily: "IBM Plex Mono", fontSize: 12, fill: "#1B2430" }} />
@@ -17,7 +18,8 @@ export default function RiskChart({ data }) {
           />
           <Bar dataKey="count" fill="#B23A2E" radius={[4, 4, 0, 0]} />
         </BarChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
