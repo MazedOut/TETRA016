@@ -10,6 +10,17 @@ import { fmtCurrency } from "../utils/format.js";
  * Props: data = [{ type, count, exposure }]
  */
 
+const CHART_PALETTE = [
+  "#B23A2E",  // stamp-red
+  "#C8922A",  // stamp-amber  
+  "#2F6F62",  // stamp-green
+  "#4F6D7A",  // muted slate-teal
+  "#6B5B95",  // muted indigo
+  "#5B8C85",  // muted cyan-green
+  "#A45D5D",  // muted rose
+  "#8B7355",  // warm bronze
+];
+
 const EXCEPTION_LABELS = {
   duplicate_invoice: "Duplicate",
   invalid_gstin: "Invalid GSTIN",
@@ -89,7 +100,7 @@ export default function ExposureBarChart({ data = [] }) {
               {sorted.map((entry, i) => (
                 <Cell
                   key={entry.type}
-                  fill={i === 0 ? "#B23A2E" : i === 1 ? "#C8922A" : "#3C4C61"}
+                  fill={CHART_PALETTE[i % CHART_PALETTE.length]}
                 />
               ))}
             </Bar>

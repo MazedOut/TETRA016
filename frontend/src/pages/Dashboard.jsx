@@ -6,13 +6,14 @@ import {
   fetchExceptionBreakdown,
   fetchFlagsOverTime,
 } from "../api/client.js";
-import { fmtCurrency } from "../utils/format.js";
+import { fmtCurrency, sanitiseReason, formatExceptionSummary } from "../utils/format.js";
 import StatsCards from "../components/StatsCards.jsx";
 import RiskChart from "../components/RiskChart.jsx";
 import RiskDonut from "../components/RiskDonut.jsx";
 import ExceptionBarChart from "../components/ExceptionBarChart.jsx";
 import ExposureBarChart from "../components/ExposureBarChart.jsx";
 import FolderView from "../components/FolderView.jsx";
+import MsmeCountdown from "../components/MsmeCountdown.jsx";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -53,9 +54,9 @@ function TrendChart({ series }) {
           <Line
             type="monotone"
             dataKey="flags"
-            stroke="#B23A2E"
+            stroke="#6B5B95"
             strokeWidth={2}
-            dot={{ fill: "#B23A2E", r: 3 }}
+            dot={{ fill: "#6B5B95", r: 3 }}
             activeDot={{ r: 5 }}
           />
         </LineChart>
@@ -166,7 +167,7 @@ export default function Dashboard() {
                     {e.id}
                   </Link>
                   <p className="text-[11px] text-ink-700 mt-0.5 leading-tight line-clamp-2">
-                    {e.narrative}
+                    {formatExceptionSummary(e)}
                   </p>
                 </li>
               ))}
@@ -177,6 +178,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* MSME 45-Day Countdown Tracker */}
+      <MsmeCountdown />
 
       <FolderView />
     </div>

@@ -322,4 +322,24 @@ export async function fetchAuditTrail(invoiceId) {
   return data;
 }
 
+// ==================== MSME 45-DAY COUNTDOWN ====================
+export async function fetchMsmeCountdown() {
+  if (USE_MOCK) {
+    await delay();
+    return {
+      totalExposure: 58200,
+      count: 0,
+      atRiskThisWeek: 0,
+      items: [],
+    };
+  }
+  const { data } = await client.get("/msme/countdown");
+  return data;
+}
+
+export async function markMsmePaid(invoiceId) {
+  const { data } = await client.post("/msme/mark-paid", { invoiceId });
+  return data;
+}
+
 export default client;

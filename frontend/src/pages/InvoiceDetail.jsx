@@ -281,14 +281,24 @@ export default function InvoiceDetail() {
 
         <div className="flex gap-2 flex-wrap">
           {invoice.fileUrl && (
-            <a
-              href={invoice.fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-paper text-ink border border-ink-600/30 px-4 py-2 rounded-md text-sm font-medium hover:bg-paper-dim transition-colors"
-            >
-              📄 View Document ↗
-            </a>
+            <>
+              <a
+                href={invoice.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-paper text-ink border border-ink-600/30 px-4 py-2 rounded-md text-sm font-medium hover:bg-paper-dim transition-colors"
+              >
+                📄 View Document ↗
+              </a>
+              <a
+                href={invoice.fileUrl}
+                download
+                className="bg-ink-700 border border-ink-600 text-paper px-4 py-2 rounded-md text-sm font-medium
+                           hover:bg-ink-600 active:scale-[0.97] transition-all duration-150"
+              >
+                ⬇ Download Invoice
+              </a>
+            </>
           )}
           <a
             href={buildDisputeMailto(invoice)}

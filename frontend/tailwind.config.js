@@ -21,9 +21,10 @@ export default {
         },
       },
       fontFamily: {
-        display: ['"IBM Plex Serif"', "Georgia", "serif"],
-        body: ['"IBM Plex Sans"', "system-ui", "sans-serif"],
-        mono: ['"IBM Plex Mono"', "monospace"],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['Inter', 'system-ui', 'sans-serif'],
+        body: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'monospace'],
       },
       // Material-inspired elevation system for cream card surfaces.
       // Dark-navy chrome (header/sidebar) uses border-b depth cue instead — see index.css.

@@ -61,11 +61,36 @@ export function fmtNumber(value, maxDecimals = 2) {
  */
 export function sanitiseReason(str) {
   if (!str || typeof str !== "string") return str ?? "";
-  // Round long decimal numbers: keep at most 1 decimal place
-  return str.replace(/\b(\d+\.\d{4,})\b/g, (match) => {
+  
+  // Replace ugly math expressions like "0.0+0.0 != 118000.0" with cleaner versions
+  let clean = str;
+  
+  // Pattern: "X+Y != Z" or "X+Y ≠ Z" math mismatch expressions -> concise summary
+  clean = clean.replace(
+    /(\d+\.?\d*)\s*\+\s*(\d+\.?\d*)\s*(!?=|!=|≠)\s*(\d+\.?\d*)/g,
+    (match, a, b, op, expected) => {
+      const sum = parseFloat(a) + parseFloat(b);
+      const exp = parseFloat(expected);
+      return `computed ₹${sum.toLocaleString("en-IN", { maximumFractionDigits: 2 })} ≠ expected ₹${exp.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+    }
+  );
+  
+  // Round long decimal numbers: keep at most 2 decimal places
+  clean = clean.replace(/\b(\d+\.\d{3,})\b/g, (match) => {
     const n = parseFloat(match);
-    return isFinite(n) ? n.toFixed(1) : match;
+    return isFinite(n) ? n.toFixed(2) : match;
   });
+  
+  // Clean up percentage patterns with many decimals
+  clean = clean.replace(/(\d+\.\d{3,})%/g, (match, num) => {
+    const n = parseFloat(num);
+    return isFinite(n) ? n.toFixed(1) + "%" : match;
+  });
+  
+  // Replace "mismatch:" prefix with cleaner text
+  clean = clean.replace(/^mismatch:\s*/i, "Amount mismatch: ");
+  
+  return clean;
 }
 
 /**
@@ -85,4 +110,42 @@ export function resolveFindingText(flag, mode = "auditor") {
     display: display || sanitiseReason(raw),
     raw,
   };
+}
+
+/**
+ * Generate a clean, high-level executive summary for a dashboard ticket based on its type.
+ * This completely removes raw math, code output, and strings for summary cards.
+ */
+export function formatExceptionSummary(ticket) {
+  const type = typeof ticket === "string" ? ticket : ticket?.type;
+  
+  switch (type) {
+    case "amount_mismatch":
+    case "internal_math_error":
+      return "Item total does not match invoice total";
+    case "invalid_gstin":
+      return "GSTIN checksum validation failed";
+    case "duplicate_invoice":
+      return "Duplicate invoice detected in records";
+    case "phantom_vendor":
+      return "Unrecognized vendor — missing from vendor master";
+    case "missing_ledger_entry":
+      return "Missing corresponding entry in purchase ledger";
+    case "typo_squatting_vendor":
+      return "Vendor name closely resembles known supplier";
+    case "pdf_metadata_tamper":
+      return "PDF document metadata indicates tampering";
+    case "invisible_text_detected":
+      return "Hidden or invisible text detected in document";
+    case "benford_deviation":
+      return "Numeric distribution deviates from expected patterns";
+    case "vendor_activity_anomaly":
+      return "Unusual billing volume or frequency for vendor";
+    case "date_mismatch":
+      return "Invoice date does not match posting date";
+    case "needs_review":
+      return "Requires manual human review";
+    default:
+      return sanitiseReason(typeof ticket === "string" ? ticket : (ticket?.narrative || "Exception detected"));
+  }
 }

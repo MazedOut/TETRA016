@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 
 /**
  * Recharts risk distribution / monthly anomaly trend visualization.
@@ -16,7 +16,12 @@ export default function RiskChart({ data }) {
           <Tooltip
             contentStyle={{ fontFamily: "IBM Plex Mono", fontSize: 12, borderRadius: 8, border: "1px solid #1B2430" }}
           />
-          <Bar dataKey="count" fill="#B23A2E" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+            {(data || []).map((entry, i) => {
+              const colors = ["#2F6F62", "#5B8C85", "#C8922A", "#A45D5D", "#B23A2E"];
+              return <Cell key={entry.bucket} fill={colors[i % colors.length]} />;
+            })}
+          </Bar>
         </BarChart>
         </ResponsiveContainer>
       </div>

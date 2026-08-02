@@ -12,6 +12,7 @@ from app.audit_trail.ticket_manager import update_status, mark_false_positive, m
 from app.ingestion.batch_handler import process_batch
 from app.orchestrator import process_invoice
 import datetime as dt
+from app.config import MSME_PAYMENT_DEADLINE_DAYS, MSME_DISALLOWED_TAX_RATE
 
 router = APIRouter()
 
@@ -349,7 +350,7 @@ def get_invoice_file(invoice_id: str, db: Session = Depends(get_db)):
 
     ext = full_path.rsplit(".", 1)[-1].lower()
     mime = "application/pdf" if ext == "pdf" else f"image/{ext}"
-    return FileResponse(full_path, media_type=mime, filename=os.path.basename(full_path))
+    return FileResponse(full_path, media_type=mime, filename=os.path.basename(full_path), content_disposition_type="inline")
 
 @router.get("/invoices/{invoice_id}")
 def invoice_detail(invoice_id: str, db: Session = Depends(get_db)):
@@ -547,4 +548,93 @@ def folder_invoices(folder_name: str, db: Session = Depends(get_db)):
         })
     result.sort(key=lambda x: x["riskScore"], reverse=True)
     return result
+
+
+@router.get("/msme/countdown")
+def msme_countdown(db: Session = Depends(get_db)):
+    invoices = db.query(Invoice).filter(Invoice.invoice_date.isnot(None)).all()
+    today = dt.datetime.now().date()
+    
+    items = []
+    total_exposure = 0.0
+    count = 0
+    at_risk_this_week = 0
+    
+    for inv in invoices:
+        tickets = db.query(Ticket).filter(Ticket.invoice_id == inv.id).all()
+        if not tickets:
+            continue
+            
+        has_open_tickets = any(t.status != "resolved" for t in tickets)
+        if not has_open_tickets:
+            continue
+            
+        inv_date = inv.invoice_date.date() if isinstance(inv.invoice_date, dt.datetime) else inv.invoice_date
+        days_elapsed = (today - inv_date).days
+        
+        if days_elapsed <= 0:
+            continue
+            
+        days_remaining = MSME_PAYMENT_DEADLINE_DAYS - days_elapsed
+        
+        amount = float(inv.total_amount or 0)
+        financial_exposure = amount * MSME_DISALLOWED_TAX_RATE
+        
+        if days_remaining >= 25:
+            urgency = "green"
+        elif 10 <= days_remaining < 25:
+            urgency = "yellow"
+        else:
+            urgency = "red"
+            
+        items.append({
+            "invoiceId": f"INV-{inv.id}",
+            "vendor": inv.vendor_name,
+            "invoiceDate": inv_date.isoformat(),
+            "amount": amount,
+            "daysElapsed": days_elapsed,
+            "daysRemaining": days_remaining,
+            "financialExposure": financial_exposure,
+            "urgency": urgency,
+            "hasOpenTickets": has_open_tickets
+        })
+        
+        total_exposure += financial_exposure
+        count += 1
+        if days_remaining <= 7:
+            at_risk_this_week += 1
+            
+    items.sort(key=lambda x: (x["daysRemaining"], -x["financialExposure"]))
+    
+    return {
+        "totalExposure": round(total_exposure, 2),
+        "count": count,
+        "atRiskThisWeek": at_risk_this_week,
+        "items": items
+    }
+
+
+@router.post("/msme/mark-paid")
+def msme_mark_paid(payload: dict, db: Session = Depends(get_db), _: None = Depends(_require_auditor)):
+    invoice_id = payload.get("invoiceId")
+    if not invoice_id:
+        return {"error": "invoiceId required"}
+        
+    real_id = int(str(invoice_id).replace("INV-", ""))
+    
+    tickets = db.query(Ticket).filter(Ticket.invoice_id == real_id, Ticket.status != "resolved").all()
+    resolved_count = 0
+    actor = "auditor"
+    reason = "Marked as paid via MSME tracker"
+    
+    for t in tickets:
+        update_status(db, t.id, "resolved", actor, reason)
+        resolved_count += 1
+        
+    return {
+        "ok": True,
+        "invoiceId": invoice_id,
+        "resolvedTickets": resolved_count
+    }
+
 
