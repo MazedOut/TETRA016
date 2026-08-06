@@ -1,186 +1,222 @@
-import { useCallback, useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { uploadInvoiceBatch } from "../api/client.js";
+import { UploadCloud, CheckCircle2, ShieldAlert, Cpu, Database, Brain, ArrowRight } from "lucide-react";
 
 /**
- * Bulk upload + invalid-file decision form (skip / retry / review).
+ * Batch upload interface.
+ * Shows a large drop zone and clearly visualizes the processing pipeline.
  */
 export default function UploadBatch() {
-  const [dragging, setDragging] = useState(false);
-  const [queue, setQueue] = useState([]);
-  const [results, setResults] = useState(null);
+  const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
-  const inputRef = useRef(null);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
-  const addFiles = useCallback((fileList) => {
-    const files = Array.from(fileList).filter((f) =>
-      ["application/pdf", "image/png", "image/jpeg"].includes(f.type)
-    );
-    setQueue((prev) => [...prev, ...files]);
-  }, []);
+  function handleFileSelect(e) {
+    if (e.target.files) {
+      setFiles(Array.from(e.target.files));
+      setResult(null);
+      setError(null);
+    }
+  }
 
   function handleDrop(e) {
     e.preventDefault();
-    setDragging(false);
-    addFiles(e.dataTransfer.files);
+    if (e.dataTransfer.files) {
+      setFiles(Array.from(e.dataTransfer.files));
+      setResult(null);
+      setError(null);
+    }
   }
 
   async function handleUpload() {
+    if (files.length === 0) return;
     setUploading(true);
-    const data = await uploadInvoiceBatch(queue);
-    setResults(data);
-    setUploading(false);
+    setError(null);
+    try {
+      const data = await uploadInvoiceBatch(files);
+      setResult(data);
+      setFiles([]);
+    } catch (err) {
+      setError("Failed to upload batch. The API might be down.");
+    } finally {
+      setUploading(false);
+    }
   }
 
-  function decide(filename, action) {
-    setResults((prev) => prev.map((r) => (r.filename === filename ? { ...r, decision: action } : r)));
-  }
-
-  function handleResetQueue() {
-    setQueue([]);
-    setResults(null);
-  }
-
-  const acceptedCount = results?.filter((r) => r.status === "accepted").length || 0;
-  const flaggedCount = results?.filter((r) => r.status !== "accepted").length || 0;
+  // Visual representation of the processing pipeline
+  const PIPELINE_STEPS = [
+    { icon: Cpu, label: "Deterministic Rules", sub: "Checksums & Math" },
+    { icon: Database, label: "Cache Validation", sub: "Duplicates & History" },
+    { icon: Brain, label: "AI Reasoning", sub: "Context & Explanations" },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-baseline justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="font-display text-2xl font-semibold">Batch upload</h2>
-          <p className="text-sm text-paper/60 mt-1">
-            Drop invoice PDFs or scans. Each file runs rules first — AI only touches what's genuinely ambiguous.
-          </p>
-        </div>
-        {results && (
-          <button
-            onClick={handleResetQueue}
-            className="text-xs font-mono px-3 py-1.5 rounded bg-ink-700 hover:bg-ink-600 text-paper border border-ink-600"
-          >
-            Upload another batch
-          </button>
-        )}
+    <div className="space-y-8 max-w-4xl mx-auto py-4">
+      {/* Header */}
+      <div className="text-center space-y-2">
+        <h2 className="font-display text-3xl font-bold text-paper">Upload Invoices</h2>
+        <p className="text-sm text-paper/60 max-w-lg mx-auto">
+          Ingest invoices for automated risk screening. TETRA applies a three-stage
+          pipeline to identify anomalies before they impact your ledger.
+        </p>
       </div>
 
-      {!results && (
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
-          className={
-            "paper-surface rounded-lg border-2 border-dashed p-12 text-center cursor-pointer transition-colors text-ink " +
-            (dragging ? "border-stamp-red" : "border-ink-600/30")
-          }
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            accept=".pdf,.png,.jpg,.jpeg"
-            className="hidden"
-            onChange={(e) => addFiles(e.target.files)}
-          />
-          <p className="font-display text-lg font-medium">Drag invoices here, or click to browse</p>
-          <p className="text-xs text-ink-600 mt-2 font-mono">PDF, PNG, JPEG — batched, not one at a time</p>
-        </div>
-      )}
-
-      {queue.length > 0 && !results && (
-        <div className="paper-surface rounded-lg p-5 text-ink">
-          <p className="text-sm font-medium mb-3">{queue.length} file(s) queued</p>
-          <ul className="space-y-1.5 mb-4 max-h-48 overflow-auto font-mono text-xs">
-            {queue.map((f, i) => (
-              <li key={i} className="flex justify-between">
-                <span>{f.name}</span>
-                <span className="text-ink-600">{(f.size / 1024).toFixed(0)} KB</span>
-              </li>
-            ))}
-          </ul>
-          <button
-            onClick={handleUpload}
-            disabled={uploading}
-            className="bg-stamp-red text-paper px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 hover:bg-stamp-red/90"
-          >
-            {uploading ? "Running rules & AI extraction…" : `Upload ${queue.length} file(s)`}
-          </button>
-        </div>
-      )}
-
-      {results && (
-        <div className="space-y-4">
-          {/* Post-Upload Summary Banner */}
-          <div className="bg-paper-surface rounded-lg p-6 border-2 border-stamp-red/40 text-ink shadow-md flex items-center justify-between flex-wrap gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="stamp-badge px-2 py-0.5 text-[10px] font-mono text-stamp-green font-bold border border-stamp-green/40">
-                  BATCH COMPLETE
-                </span>
-                <h3 className="font-display text-lg font-semibold">Processing Complete</h3>
+      {/* Pipeline visualization */}
+      <div className="flex items-center justify-center gap-2 sm:gap-4 my-8">
+        {PIPELINE_STEPS.map((step, i) => (
+          <div key={i} className="flex items-center gap-2 sm:gap-4">
+            <div className="flex flex-col items-center text-center w-28 sm:w-36">
+              <div className="w-12 h-12 rounded-full bg-ink-800 border border-ink-600/50 flex items-center justify-center mb-3">
+                <step.icon size={20} className="text-ink-600" strokeWidth={1.5} />
               </div>
-              <p className="text-sm font-sans text-ink-700">
-                Processed <span className="font-bold font-mono">{results.length}</span> invoice(s):{" "}
-                <span className="text-stamp-green font-semibold">{acceptedCount} accepted</span>,{" "}
-                <span className="text-stamp-amber font-semibold">{flaggedCount} flagged for review</span>.
-              </p>
+              <p className="text-xs font-semibold text-paper/80">{step.label}</p>
+              <p className="text-[10px] font-mono text-paper/40 mt-1">{step.sub}</p>
             </div>
+            {i < PIPELINE_STEPS.length - 1 && (
+              <ArrowRight size={16} className="text-ink-600/50 shrink-0 -mt-8" />
+            )}
+          </div>
+        ))}
+      </div>
 
-            <Link
-              to="/exceptions"
-              className="bg-stamp-red text-paper px-5 py-2.5 rounded-md text-sm font-medium hover:bg-stamp-red/90 transition-all flex items-center gap-2 shadow"
+      {/* Upload area */}
+      {!result ? (
+        <div className="bg-ink-800 border border-ink-600/30 rounded-2xl p-8 shadow-elev-2 relative overflow-hidden">
+          <div
+            className={`border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200
+                        ${
+                          files.length > 0
+                            ? "border-stamp-amber/50 bg-stamp-amber/5"
+                            : "border-ink-600/50 hover:border-ink-600 hover:bg-ink-700/30"
+                        }`}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+          >
+            <UploadCloud
+              size={48}
+              className={`mx-auto mb-4 ${
+                files.length > 0 ? "text-stamp-amber" : "text-ink-600"
+              }`}
+              strokeWidth={1.2}
+            />
+            {files.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-lg font-semibold text-paper">
+                  {files.length} file{files.length !== 1 ? "s" : ""} selected
+                </p>
+                <p className="text-sm font-mono text-paper/50">
+                  Ready for risk screening
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-lg font-semibold text-paper">
+                  Drag and drop invoice PDFs here
+                </p>
+                <p className="text-sm font-mono text-paper/40">
+                  or click below to browse your files
+                </p>
+              </div>
+            )}
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.png,.jpg,.jpeg"
+              onChange={handleFileSelect}
+              className="hidden"
+              id="file-upload"
+            />
+            <label
+              htmlFor="file-upload"
+              className="mt-6 inline-block bg-ink-700 border border-ink-600/60 text-paper/80
+                         px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-ink-600 hover:text-paper
+                         cursor-pointer transition-colors"
             >
-              View in Exception Queue &rarr;
-            </Link>
+              Browse Files
+            </label>
           </div>
 
-          <div className="paper-surface rounded-lg p-5 text-ink">
-            <p className="text-sm font-semibold mb-4">Detailed Batch Breakdown</p>
-            <div className="space-y-3">
-              {results.map((r) => (
-                <div key={r.filename} className="flex items-center justify-between border-b border-ink-600/10 pb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-mono text-sm font-medium">{r.filename}</p>
-                      {r.risk_level && (
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase ${
-                          r.risk_level === 'high' ? 'bg-stamp-red/10 text-stamp-red' : 
-                          r.risk_level === 'medium' ? 'bg-stamp-amber/10 text-stamp-amber' : 
-                          'bg-stamp-green/10 text-stamp-green'
-                        }`}>
-                          {r.risk_level} RISK
-                        </span>
-                      )}
-                    </div>
-                    <p className={"text-xs font-mono mt-0.5 " + (r.status === "accepted" ? "text-stamp-green" : "text-stamp-amber")}>
-                      {r.status === "accepted" ? "✓ Accepted & scored cleanly" : "⚠ Flagged for review"}
-                    </p>
-                    {r.invoice_id && (
-                      <Link to={`/invoices/${r.invoice_id}`} className="text-[11px] font-mono text-ink-600 hover:text-ink underline mt-1 inline-block">
-                        View in workspace &rarr;
-                      </Link>
-                    )}
-                  </div>
-                  {r.status === "needs-review" && !r.decision && (
-                    <div className="flex gap-2">
-                      {["Skip", "Retry", "Review"].map((action) => (
-                        <button
-                          key={action}
-                          onClick={() => decide(r.filename, action)}
-                          className="text-xs font-medium px-3 py-1.5 rounded-md bg-ink text-paper hover:bg-ink-700 transition-colors"
-                        >
-                          {action}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {r.decision && <span className="text-xs font-mono text-ink-600 italic">marked: {r.decision}</span>}
-                </div>
-              ))}
+          {error && (
+            <div className="mt-6 bg-stamp-red/10 border border-stamp-red/30 rounded-lg p-4
+                            text-sm text-stamp-red flex items-start gap-3">
+              <ShieldAlert size={18} className="shrink-0 mt-0.5" />
+              <p>{error}</p>
             </div>
+          )}
+
+          {files.length > 0 && (
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={handleUpload}
+                disabled={uploading}
+                className="bg-stamp-red text-paper px-8 py-3 rounded-lg text-sm font-semibold
+                           hover:bg-stamp-red/90 active:scale-[0.97] disabled:opacity-50
+                           transition-all flex items-center gap-2 shadow-sm"
+              >
+                {uploading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-paper/20 border-t-paper rounded-full animate-spin" />
+                    Processing Pipeline…
+                  </>
+                ) : (
+                  <>
+                    Start Analysis
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-ink-800 border border-ink-600/30 rounded-2xl p-10 text-center space-y-6 animate-scaleIn">
+          <div className="w-20 h-20 rounded-full bg-stamp-green/10 border border-stamp-green/20
+                          flex items-center justify-center mx-auto">
+            <CheckCircle2 size={40} className="text-stamp-green" strokeWidth={1.5} />
+          </div>
+          <div className="space-y-2">
+            <h3 className="font-display text-2xl font-bold text-paper">Batch Processed</h3>
+            <p className="text-sm text-paper/60 font-sans max-w-sm mx-auto">
+              Successfully ingested {result.processedCount} invoice{result.processedCount !== 1 ? "s" : ""}.
+              The analysis pipeline generated {result.flagCount} exception flag{result.flagCount !== 1 ? "s" : ""}.
+            </p>
+          </div>
+
+          <div className="bg-ink-700/30 border border-ink-600/20 rounded-xl p-6 max-w-sm mx-auto
+                          grid grid-cols-2 gap-4 divide-x divide-ink-600/30">
+            <div>
+              <p className="text-3xl font-display font-bold text-paper">{result.processedCount}</p>
+              <p className="text-[10px] font-mono text-paper/40 uppercase tracking-widest mt-1">
+                Processed
+              </p>
+            </div>
+            <div>
+              <p className="text-3xl font-display font-bold text-stamp-red">{result.flagCount}</p>
+              <p className="text-[10px] font-mono text-stamp-red/60 uppercase tracking-widest mt-1">
+                Exceptions
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-4 flex items-center justify-center gap-4">
+            <button
+              onClick={() => {
+                setResult(null);
+                setFiles([]);
+              }}
+              className="text-xs font-medium text-paper/50 hover:text-paper transition-colors"
+            >
+              Upload another batch
+            </button>
+            <Link
+              to="/exceptions"
+              className="bg-stamp-red text-paper px-6 py-2.5 rounded-lg text-sm font-semibold
+                         hover:bg-stamp-red/90 transition-colors shadow-sm"
+            >
+              View Review Queue
+            </Link>
           </div>
         </div>
       )}

@@ -1,154 +1,249 @@
 import { Link } from "react-router-dom";
-import { useMode } from "../context/ModeContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import { fmtCurrency } from "../utils/format.js";
 import FindingRow from "./FindingRow.jsx";
+import {
+  ShieldAlert,
+  ChevronRight,
+  GitCompare,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Eye,
+  FileSearch,
+} from "lucide-react";
 
-function riskTone(score) {
-  if (score >= 61) return { text: "text-stamp-red", label: "HIGH" };
-  if (score >= 21) return { text: "text-stamp-amber", label: "REVIEW" };
-  return { text: "text-stamp-green", label: "CLEAR" };
+// ─── Risk level config ───────────────────────────────────────────────────────
+function riskConfig(score) {
+  if (score >= 75)
+    return {
+      label: "CRITICAL",
+      pill: "bg-stamp-red/15 text-stamp-red border-stamp-red/30",
+      bar: "bg-stamp-red",
+      text: "text-stamp-red",
+    };
+  if (score >= 50)
+    return {
+      label: "HIGH",
+      pill: "bg-stamp-red/10 text-stamp-red border-stamp-red/20",
+      bar: "bg-stamp-red",
+      text: "text-stamp-red",
+    };
+  if (score >= 25)
+    return {
+      label: "MEDIUM",
+      pill: "bg-stamp-amber/15 text-stamp-amber border-stamp-amber/30",
+      bar: "bg-stamp-amber",
+      text: "text-stamp-amber",
+    };
+  return {
+    label: "LOW",
+    pill: "bg-stamp-green/15 text-stamp-green border-stamp-green/30",
+    bar: "bg-stamp-green",
+    text: "text-stamp-green",
+  };
 }
 
-function confidenceTone(score) {
-  if (score >= 80) return "text-stamp-green bg-stamp-green/15 border-stamp-green/30";
-  if (score >= 60) return "text-stamp-amber bg-stamp-amber/15 border-stamp-amber/30";
-  return "text-stamp-red bg-stamp-red/15 border-stamp-red/30";
-}
-
-const STATUS_STYLES = {
-  open: "bg-stamp-red/15 text-stamp-red",
-  "in-review": "bg-stamp-amber/15 text-stamp-amber",
-  resolved: "bg-stamp-green/15 text-stamp-green",
-  escalated: "bg-ink/10 text-ink",
+const STATUS_CONFIG = {
+  open: { label: "Open", icon: AlertTriangle, cls: "text-stamp-red/70" },
+  "in-review": { label: "In Review", icon: Eye, cls: "text-stamp-amber/70" },
+  resolved: { label: "Resolved", icon: CheckCircle2, cls: "text-stamp-green/70" },
+  escalated: { label: "Escalated", icon: Clock, cls: "text-paper/40" },
 };
 
-const STATUS_LABELS = {
-  open: "Open",
-  "in-review": "In review",
-  resolved: "Resolved",
-  escalated: "Escalated",
-};
-
-const EXCEPTION_TITLES = {
-  duplicate_invoice: "Duplicate Invoice Detected",
-  invalid_gstin: "Invalid GSTIN Checksum",
+const EXCEPTION_LABELS = {
+  duplicate_invoice: "Duplicate Invoice",
+  invalid_gstin: "Invalid GSTIN",
   amount_mismatch: "Amount / Tax Mismatch",
-  internal_math_error: "Subtotal Math Calculation Error",
-  phantom_vendor: "Unregistered / Phantom Vendor",
-  typo_squatting_vendor: "Vendor Name Typo-Squatting",
-  pdf_metadata_tamper: "PDF Document Metadata Modified",
+  internal_math_error: "Calculation Error",
+  phantom_vendor: "Phantom Vendor",
+  typo_squatting_vendor: "Vendor Typo-Squatting",
+  pdf_metadata_tamper: "Document Metadata Anomaly",
   invisible_text_detected: "Hidden Text Detected",
-  benford_deviation: "Benford Law Numeric Anomaly",
-  vendor_activity_anomaly: "Vendor Volume Anomaly",
+  benford_deviation: "Benford Law Anomaly",
+  vendor_activity_anomaly: "Vendor Activity Anomaly",
+  needs_review: "Needs Review",
+};
+
+const MSME_EXCEPTION_LABELS = {
+  duplicate_invoice: "Possible duplicate invoice",
+  invalid_gstin: "GST number may be invalid",
+  amount_mismatch: "Invoice amount doesn't match records",
+  internal_math_error: "Calculation discrepancy",
+  phantom_vendor: "Supplier may not be registered",
+  typo_squatting_vendor: "Supplier name looks suspicious",
+  pdf_metadata_tamper: "Document may have been modified",
+  invisible_text_detected: "Document contains hidden content",
+  benford_deviation: "Unusual number pattern",
+  vendor_activity_anomaly: "Unusual billing pattern from this supplier",
+  needs_review: "Needs review",
 };
 
 export default function TicketCard({ ticket, selected, onToggleSelect }) {
-  const { mode } = useMode();
-  const { text, label } = riskTone(ticket.riskScore);
-  const confStyle = confidenceTone(ticket.confidenceScore);
+  const { mode } = useAuth();
+  const risk = riskConfig(ticket.riskScore);
+  const isMsme = mode === "msme";
 
-  const displayFlag = mode === "msme"
-    ? (EXCEPTION_TITLES[ticket.flag] || ticket.flag)
-    : ticket.flag;
+  const flagLabel = isMsme
+    ? (MSME_EXCEPTION_LABELS[ticket.flag] || EXCEPTION_LABELS[ticket.flag] || ticket.flag)
+    : (EXCEPTION_LABELS[ticket.flag] || ticket.flag);
 
-  const displayNarrative = mode === "msme"
+  const narrative = isMsme
     ? (ticket.msmeNarrative || ticket.aiNarrative)
     : ticket.aiNarrative;
 
+  const statusInfo = STATUS_CONFIG[ticket.status] ?? STATUS_CONFIG.open;
+  const StatusIcon = statusInfo.icon;
+
+  const isForensic =
+    ticket.flag === "pdf_metadata_tamper" || ticket.flag === "invisible_text_detected";
+
   return (
     <div
-      className="paper-surface rounded-xl p-4 text-ink flex flex-col items-start gap-4
-                 hover:border-ink-600/40 hover:-translate-y-0.5 transition-all duration-150"
+      className={`bg-ink-800 border rounded-xl transition-all duration-150 animate-slideUp
+                  hover:border-ink-600/70
+                  ${selected ? "border-stamp-amber/40 bg-ink-700/60" : "border-ink-600/30"}`}
     >
-      <div className="flex items-start gap-4 w-full">
+      {/* ── Card header ── */}
+      <div className="p-4 flex items-start gap-3">
+        {/* Checkbox (auditor only) */}
         {onToggleSelect && (
           <input
             type="checkbox"
             checked={!!selected}
             onChange={() => onToggleSelect(ticket.id)}
             aria-label={`Select ${ticket.id}`}
-            className="mt-2 rounded border-ink-600/30 text-stamp-red focus:ring-stamp-red cursor-pointer"
+            className="mt-1 rounded border-ink-600/50 text-stamp-red focus:ring-stamp-red
+                       cursor-pointer accent-stamp-red shrink-0"
           />
         )}
 
+        {/* Risk score pill */}
         <div
-          className={`stamp-badge w-14 h-14 shrink-0 flex flex-col items-center justify-center font-mono font-semibold text-[10px] ${text}`}
+          className={`flex flex-col items-center justify-center shrink-0 min-w-[52px]
+                      px-2 py-1.5 rounded-lg border font-mono ${risk.pill}`}
         >
-          <span className="text-base leading-none font-display font-bold">{ticket.riskScore}</span>
-          <span className="mt-0.5 opacity-80">{label}</span>
+          <span className="text-base font-bold leading-none">{ticket.riskScore}</span>
+          <span className="text-[9px] font-bold tracking-wider mt-0.5 opacity-80">
+            {risk.label}
+          </span>
         </div>
 
+        {/* Main info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <Link to={`/invoices/${ticket.invoiceId}`} className="font-mono text-sm font-semibold text-stamp-red hover:underline">
-              {ticket.id}
-            </Link>
-            <span className="text-xs text-ink-600 font-mono px-1.5 py-0.5 rounded bg-ink/5">{ticket.invoiceId}</span>
-            <span className="text-xs font-mono text-ink-600 font-semibold">{fmtCurrency(ticket.amount)}</span>
+            <span className="font-mono text-xs font-semibold text-paper/60">
+              {ticket.invoiceId}
+            </span>
+            <span className="text-paper/20">·</span>
+            <span className="font-mono text-xs font-semibold text-paper/80">
+              {fmtCurrency(ticket.amount)}
+            </span>
+            {isForensic && (
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full
+                               bg-stamp-red/20 text-stamp-red border border-stamp-red/30">
+                Forensic Alert
+              </span>
+            )}
           </div>
-          
-          <p className="text-sm font-medium mt-0.5">{ticket.vendor}</p>
-          <p className="text-xs font-mono font-semibold text-ink-600 mt-1">{displayFlag}</p>
 
-          {/* Forensic alert badge — only for metadata/tamper flags */}
-          {(ticket.flag === "pdf_metadata_tamper" || ticket.flag === "invisible_text_detected") && (
-            <div className="flex items-center gap-1.5 mt-1.5">
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-stamp-red/20 text-stamp-red border border-stamp-red/30 animate-pulse">
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                {ticket.flag === "pdf_metadata_tamper" ? "🔬 Forensic Alert" : "👻 Hidden Text"}
-              </span>
-            </div>
-          )}
+          <p className="text-sm font-semibold text-paper mt-0.5 truncate">
+            {ticket.vendor}
+          </p>
 
-          {displayNarrative && (
-            <div className={"text-xs mt-2 p-2 rounded border font-sans leading-relaxed " + (mode === "msme" ? "bg-stamp-amber/10 border-stamp-amber/30 text-ink" : "bg-ink/5 border-ink-600/10 text-ink-700")}>
-              <span className="font-semibold text-[10px] uppercase font-mono tracking-wider block mb-1 text-ink-600">
-                {mode === "msme" ? "💡 Plain-Language Advice" : "🤖 Technical Narrative"}
-              </span>
-              <FindingRow
-                flag={{
-                  type: ticket.flag,
-                  detail: ticket.aiNarrative,
-                  rawReason: ticket.rawReason,
-                  msmeNarrative: ticket.msmeNarrative,
-                  status: ticket.status,
-                }}
-                mode={mode}
-              />
-            </div>
-          )}
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <span className="text-xs text-paper/50 font-sans">{flagLabel}</span>
+            {ticket.financialExposure?.itcAtRisk > 0 && (
+              <>
+                <span className="text-paper/20">·</span>
+                <span className="text-xs font-mono text-stamp-red/80">
+                  {fmtCurrency(ticket.financialExposure.itcAtRisk)} ITC at risk
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
+        {/* Right: confidence + status */}
         <div className="flex flex-col items-end gap-2 shrink-0">
-          <div className={`px-2 py-1 rounded-lg border text-right font-mono ${confStyle}`}>
-            <p className="text-[10px] uppercase tracking-wider opacity-70">confidence</p>
-            <p className="text-sm font-bold leading-none">{ticket.confidenceScore}%</p>
+          {/* Confidence — visually distinct from risk */}
+          <div className="text-right">
+            <p className="text-[9px] font-mono text-paper/30 uppercase tracking-wider">
+              Extraction
+            </p>
+            <p className="text-xs font-mono font-bold text-paper/60">
+              {ticket.confidenceScore}%
+            </p>
           </div>
 
-          <span className={`text-xs font-mono px-2 py-1 rounded-full ${STATUS_STYLES[ticket.status]}`}>
-            {STATUS_LABELS[ticket.status]}
-          </span>
+          {/* Status */}
+          <div className={`flex items-center gap-1 text-[10px] font-mono ${statusInfo.cls}`}>
+            <StatusIcon size={10} strokeWidth={2} />
+            <span>{statusInfo.label}</span>
+          </div>
         </div>
       </div>
 
-      <div className="w-full flex gap-2 mt-2 ml-4">
+      {/* ── AI narrative (collapsible feel — shown when present) ── */}
+      {narrative && (
+        <div
+          className={`mx-4 mb-3 px-3 py-2.5 rounded-lg border text-xs font-sans leading-relaxed
+                      ${isMsme
+                        ? "bg-stamp-amber/5 border-stamp-amber/20 text-paper/70"
+                        : "bg-ink-700/40 border-ink-600/20 text-paper/60"
+                      }`}
+        >
+          <span
+            className={`block text-[10px] font-mono uppercase tracking-wider font-semibold mb-1
+                        ${isMsme ? "text-stamp-amber/60" : "text-paper/30"}`}
+          >
+            {isMsme ? "What this means for you" : "AI Analysis"}
+          </span>
+          <FindingRow
+            flag={{
+              type: ticket.flag,
+              detail: ticket.aiNarrative,
+              rawReason: ticket.rawReason,
+              msmeNarrative: ticket.msmeNarrative,
+              status: ticket.status,
+            }}
+            mode={mode}
+          />
+        </div>
+      )}
+
+      {/* ── Risk score bar ── */}
+      <div className="mx-4 mb-0.5">
+        <div className="h-0.5 w-full bg-ink-700 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${risk.bar}`}
+            style={{ width: `${ticket.riskScore}%` }}
+          />
+        </div>
+      </div>
+
+      {/* ── Actions ── */}
+      <div className="px-4 py-3 flex items-center gap-2 border-t border-ink-600/20 mt-2">
         <Link
           to={`/invoices/${ticket.invoiceId}`}
-          className="text-xs font-medium px-4 py-2 rounded-lg border border-ink-600/30 text-ink
-                     hover:bg-ink-600/10 active:scale-[0.97] transition-all duration-150"
+          className="flex items-center gap-1.5 text-xs font-medium text-paper/70
+                     bg-ink-700/60 hover:bg-ink-700 border border-ink-600/30 hover:border-ink-600
+                     px-3 py-1.5 rounded-lg transition-all duration-150 flex-1 justify-center"
         >
-          View full invoice &rarr;
+          <FileSearch size={12} strokeWidth={2} />
+          Review Investigation
+          <ChevronRight size={11} strokeWidth={2} />
         </Link>
+
         {ticket.evidenceData?.duplicate_invoice_id && (
           <Link
             to={`/invoices/${ticket.invoiceId}/compare/${ticket.evidenceData.duplicate_invoice_id}`}
-            className="text-xs font-medium px-4 py-2 rounded-lg border border-stamp-amber/40
-                       text-stamp-amber bg-stamp-amber/5 hover:bg-stamp-amber/10 active:scale-[0.97]
-                       transition-all duration-150"
+            className="flex items-center gap-1.5 text-xs font-medium text-stamp-amber/70
+                       hover:text-stamp-amber border border-stamp-amber/20 hover:border-stamp-amber/40
+                       px-3 py-1.5 rounded-lg transition-all duration-150 bg-stamp-amber/5"
           >
-            Compare side-by-side &rarr;
+            <GitCompare size={12} strokeWidth={2} />
+            Compare
           </Link>
         )}
       </div>

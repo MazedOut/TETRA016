@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
+import { BrowserRouter, Routes, Route, NavLink, useNavigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard.jsx";
 import ExceptionQueue from "./pages/ExceptionQueue.jsx";
 import InvoiceDetail from "./pages/InvoiceDetail.jsx";
@@ -7,28 +7,51 @@ import Reports from "./pages/Reports.jsx";
 import FolderDetail from "./pages/FolderDetail.jsx";
 import DuplicateComparison from "./pages/DuplicateComparison.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
+import VendorsPage from "./pages/VendorsPage.jsx";
+import AuditTrailPage from "./pages/AuditTrailPage.jsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { resetDemoData } from "./api/client.js";
 import { useState } from "react";
+import {
+  LayoutDashboard,
+  ListChecks,
+  FileText,
+  Building2,
+  Upload,
+  BarChart2,
+  Clock,
+  Settings,
+  LogOut,
+  ShieldCheck,
+  ChevronRight,
+} from "lucide-react";
 
-const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/upload", label: "Batch Upload" },
-  { to: "/exceptions", label: "Exception Queue" },
-  { to: "/reports", label: "Reports" },
-];
+// ─── Sidebar nav section heading ───────────────────────────────────────────
+function NavSection({ label }) {
+  return (
+    <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-ink-600 px-3 pt-5 pb-1.5">
+      {label}
+    </p>
+  );
+}
 
-const ROLE_STYLES = {
-  auditor: {
-    badge: "bg-stamp-red/15 border-stamp-red/40 text-stamp-red",
-    icon: "🔍",
-  },
-  msme: {
-    badge: "bg-stamp-green/15 border-stamp-green/40 text-stamp-green",
-    icon: "📄",
-  },
-};
+// ─── Sidebar nav item ───────────────────────────────────────────────────────
+function SidebarLink({ to, icon: Icon, label, end }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        "sidebar-link" + (isActive ? " active" : "")
+      }
+    >
+      <Icon size={15} strokeWidth={1.8} />
+      <span>{label}</span>
+    </NavLink>
+  );
+}
 
+// ─── Shell with sidebar ─────────────────────────────────────────────────────
 function Shell({ children }) {
   const { role, logout, canWrite } = useAuth();
   const [resetting, setResetting] = useState(false);
@@ -39,110 +62,165 @@ function Shell({ children }) {
     setResetting(true);
     try {
       await resetDemoData();
-      setResetMsg("Data cleared!");
+      setResetMsg("Cleared");
       setTimeout(() => {
         setResetMsg("");
         window.location.reload();
       }, 800);
     } catch {
-      setResetMsg("Reset failed");
+      setResetMsg("Failed");
     } finally {
       setResetting(false);
     }
   }
 
-  const roleStyle = ROLE_STYLES[role] ?? ROLE_STYLES.auditor;
-
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Dark-navy header — uses border-b as depth cue, NOT box-shadow (see index.css) */}
-      <header className="border-b border-ink-600 bg-ink sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="stamp-badge w-9 h-9 text-stamp-red text-[9px] font-mono font-bold flex items-center justify-center">
-              IRS
+    <div className="min-h-screen flex">
+      {/* ── Left Sidebar ── */}
+      <aside className="app-sidebar">
+        {/* Brand */}
+        <div className="px-4 py-5 border-b border-ink-700/60">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-md bg-stamp-red/90 flex items-center justify-center shrink-0">
+              <ShieldCheck size={14} strokeWidth={2.5} className="text-paper" />
             </div>
             <div>
-              <h1 className="font-display text-lg font-semibold leading-none text-paper">
-                Invoice Risk Scanner
+              <h1 className="font-display text-[15px] font-bold leading-none text-paper tracking-tight">
+                TETRA
               </h1>
-              <p className="text-[11px] text-ink-600 font-mono tracking-wide">
-                rule &rarr; cache &rarr; AI
+              <p className="text-[10px] font-mono text-ink-600 mt-0.5 leading-none">
+                Invoice Risk Intelligence
               </p>
             </div>
           </div>
-
-          <nav className="flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  "px-3 py-2 text-sm rounded-lg font-medium transition-all duration-150 " +
-                  (isActive
-                    ? "bg-paper text-ink shadow-sm"
-                    : "text-paper/70 hover:text-paper hover:bg-ink-700 active:scale-[0.97]")
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            {/* Dev reset — auditor only */}
-            {canWrite && (
-              <button
-                onClick={handleReset}
-                disabled={resetting}
-                className="text-xs font-mono px-3 py-1.5 rounded-lg bg-ink-700 hover:bg-stamp-red/20
-                           text-paper/80 hover:text-stamp-red border border-ink-600 transition-all duration-150
-                           active:scale-[0.97] disabled:opacity-50"
-                title="Dev Tool: Wipe Invoice and Ticket tables"
-              >
-                {resetMsg || (resetting ? "Resetting..." : "Reset demo data")}
-              </button>
-            )}
-
-            {/* Role badge + switch */}
-            <div className="flex items-center gap-2">
-              <span
-                className={`flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-full border font-semibold ${roleStyle.badge}`}
-              >
-                <span>{roleStyle.icon}</span>
-                {role === "auditor" ? "Auditor" : "MSME"}
-              </span>
-              <button
-                onClick={logout}
-                className="text-xs font-mono text-paper/50 hover:text-paper/80 transition-all duration-150
-                           px-2 py-1 rounded-lg hover:bg-ink-700 active:scale-[0.97]"
-                title="Switch role"
-              >
-                Switch ↩
-              </button>
-            </div>
-          </div>
         </div>
-      </header>
 
-      {/* 8px spacing grid: py-8 = 32px, px-6 = 24px */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8">{children}</main>
+        {/* Navigation */}
+        <nav className="flex-1 px-2 py-1 space-y-0.5 overflow-y-auto">
+          <NavSection label="Workspace" />
+          <SidebarLink to="/" icon={LayoutDashboard} label="Overview" end />
+          <SidebarLink to="/exceptions" icon={ListChecks} label="Review Queue" />
+          <SidebarLink to="/invoices-list" icon={FileText} label="Invoices" />
+          <SidebarLink to="/vendors" icon={Building2} label="Vendors" />
 
-      <footer className="border-t border-ink-600 py-4">
-        <p className="max-w-6xl mx-auto px-6 text-[11px] font-mono text-ink-600">
-          Every place the model could be wrong, there&apos;s a form, not an assumption.
-          {!canWrite && (
-            <span className="ml-3 text-stamp-green/70">
-              MSME view — read-only
+          <NavSection label="Operations" />
+          <SidebarLink to="/upload" icon={Upload} label="Upload Batch" />
+          <SidebarLink to="/reports" icon={BarChart2} label="Reports" />
+
+          <NavSection label="Control" />
+          <SidebarLink to="/audit-trail" icon={Clock} label="Audit Trail" />
+        </nav>
+
+        {/* Bottom: mode + role actions */}
+        <div className="border-t border-ink-700/60 px-3 py-4 space-y-3">
+          {/* Role indicator */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-mono text-ink-600 uppercase tracking-wider">
+                Signed in as
+              </p>
+              <p className="text-xs font-semibold text-paper mt-0.5">
+                {role === "auditor" ? "Auditor" : "MSME / Vendor"}
+              </p>
+            </div>
+            <span
+              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                role === "auditor"
+                  ? "bg-stamp-red/15 text-stamp-red border-stamp-red/30"
+                  : "bg-stamp-green/15 text-stamp-green border-stamp-green/30"
+              }`}
+            >
+              {role === "auditor" ? "AUDITOR" : "MSME"}
             </span>
+          </div>
+
+          {/* Mode switch */}
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 w-full text-xs font-medium text-ink-600 hover:text-paper
+                       px-2 py-1.5 rounded-md hover:bg-ink-700/60 transition-all duration-150"
+            title="Switch role / Sign out"
+          >
+            <LogOut size={13} strokeWidth={1.8} />
+            <span>Switch to {role === "auditor" ? "MSME View" : "Auditor Mode"}</span>
+          </button>
+
+          {/* Dev reset — auditor only */}
+          {canWrite && (
+            <button
+              onClick={handleReset}
+              disabled={resetting}
+              className="text-[10px] font-mono text-ink-600 hover:text-stamp-red/70 transition-colors
+                         disabled:opacity-50 px-1"
+              title="Dev Tool: Wipe Invoice and Ticket tables"
+            >
+              {resetMsg || (resetting ? "Resetting…" : "Reset demo data")}
+            </button>
           )}
-        </p>
-      </footer>
+        </div>
+      </aside>
+
+      {/* ── Main Content ── */}
+      <div className="app-main flex-1">
+        <main className="flex-1 px-8 py-8 max-w-[1320px] w-full mx-auto">
+          {children}
+        </main>
+        <footer className="border-t border-ink-700/40 py-3 px-8">
+          <p className="text-[11px] font-mono text-ink-600 max-w-[1320px] mx-auto">
+            TETRA · rule → cache → AI · Every place the model could be wrong, there&apos;s a form, not an assumption.
+            {!canWrite && (
+              <span className="ml-3 text-stamp-green/70">MSME view — read-only</span>
+            )}
+          </p>
+        </footer>
+      </div>
     </div>
   );
 }
 
+// ─── Invoices list placeholder (routes to exception queue filtered) ──────────
+function InvoicesListPage() {
+  const navigate = useNavigate();
+  // Redirect to exceptions — the invoice list IS the exception queue when viewed flat
+  // but with all invoices. We show a simple FolderView-style browser.
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-display text-2xl font-semibold text-paper">Invoices</h2>
+        <p className="text-sm text-paper/60 mt-1">
+          Browse all invoices by folder, vendor, or category.
+        </p>
+      </div>
+      <div className="paper-surface rounded-xl p-8 text-ink text-center space-y-4">
+        <FileText size={40} className="mx-auto text-ink-600" strokeWidth={1.2} />
+        <div>
+          <p className="font-display text-lg font-semibold">Browse by Vendor &amp; Category</p>
+          <p className="text-sm text-ink-600 font-sans mt-1">
+            Invoices are organized into vendor and category folders.
+          </p>
+        </div>
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={() => navigate("/vendors")}
+            className="bg-ink text-paper px-5 py-2 rounded-lg text-sm font-medium
+                       hover:bg-ink-700 active:scale-[0.97] transition-all duration-150"
+          >
+            Browse by Vendor
+          </button>
+          <button
+            onClick={() => navigate("/exceptions")}
+            className="bg-stamp-red text-paper px-5 py-2 rounded-lg text-sm font-medium
+                       hover:bg-stamp-red/90 active:scale-[0.97] transition-all duration-150"
+          >
+            View Review Queue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Route tree ─────────────────────────────────────────────────────────────
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return <LoginPage />;
@@ -152,10 +230,13 @@ function AppRoutes() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/exceptions" element={<ExceptionQueue />} />
         <Route path="/invoices/:id" element={<InvoiceDetail />} />
+        <Route path="/invoices-list" element={<InvoicesListPage />} />
         <Route path="/upload" element={<UploadBatch />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/folders/:folderName" element={<FolderDetail />} />
         <Route path="/invoices/:id/compare/:targetId" element={<DuplicateComparison />} />
+        <Route path="/vendors" element={<VendorsPage />} />
+        <Route path="/audit-trail" element={<AuditTrailPage />} />
       </Routes>
     </Shell>
   );

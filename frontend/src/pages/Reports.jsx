@@ -1,223 +1,221 @@
 import { useState } from "react";
 import { generateReport } from "../api/client.js";
-import { useMode } from "../context/ModeContext.jsx";
-import { fmtCurrency, sanitiseReason } from "../utils/format.js";
+import { fmtCurrency } from "../utils/format.js";
+import { BarChart2, CheckCircle2, ShieldAlert, Download, Clock } from "lucide-react";
 
-const EXCEPTION_TYPES = [
-  "duplicate_invoice",
-  "invalid_gstin",
-  "amount_mismatch",
-  "sequence_gap",
-  "phantom_vendor",
-  "typo_squatting_vendor",
-  "pdf_metadata_tamper",
-  "invisible_text_detected",
-  "benford_deviation",
-  "vendor_activity_anomaly",
-];
-
-const TYPE_LABELS = {
-  duplicate_invoice: "Duplicate Invoice",
-  invalid_gstin: "Invalid GSTIN",
-  amount_mismatch: "Amount Mismatch",
-  sequence_gap: "Sequence Gap",
-  phantom_vendor: "Phantom Vendor",
-  typo_squatting_vendor: "Typo Squatting",
-  pdf_metadata_tamper: "Metadata Tamper",
-  invisible_text_detected: "Hidden Text",
-  benford_deviation: "Benford Deviation",
-  vendor_activity_anomaly: "Vendor Activity Anomaly",
-};
-
+/**
+ * Reports page — generate and view PDF/CSV style reports.
+ */
 export default function Reports() {
-  const { mode } = useMode();
-  const [from, setFrom] = useState("2026-06-01");
-  const [to, setTo] = useState("2026-08-01");
-  const [minRisk, setMinRisk] = useState(0);
-  const [types, setTypes] = useState([]);
-  const [generating, setGenerating] = useState(false);
-  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [report, setReport] = useState(null);
+  const [error, setError] = useState(null);
 
-  function toggleType(t) {
-    setTypes((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  // Form state
+  const [dateRange, setDateRange] = useState("30");
+  const [exceptionTypes, setExceptionTypes] = useState([
+    "duplicate_invoice",
+    "amount_mismatch",
+  ]);
+
+  const EXCEPTION_OPTIONS = [
+    { id: "duplicate_invoice", label: "Duplicates" },
+    { id: "invalid_gstin", label: "Invalid GSTIN" },
+    { id: "amount_mismatch", label: "Amount Mismatches" },
+    { id: "phantom_vendor", label: "Phantom Vendors" },
+    { id: "pdf_metadata_tamper", label: "Metadata Tampering" },
+    { id: "invisible_text_detected", label: "Hidden Text" },
+  ];
+
+  function toggleException(id) {
+    setExceptionTypes((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   }
 
   async function handleGenerate(e) {
     e.preventDefault();
-    setGenerating(true);
+    if (exceptionTypes.length === 0) {
+      setError("Please select at least one exception type to include.");
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    setReport(null);
     try {
-      const data = await generateReport({ from, to, minRisk, types });
-      setResult(data);
+      const data = await generateReport({ dateRange, types: exceptionTypes });
+      setReport(data);
     } catch (err) {
-      alert("Failed to generate report");
+      setError("Failed to generate report. Please try again.");
     } finally {
-      setGenerating(false);
+      setLoading(false);
     }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl">
+      {/* Header */}
       <div>
-        <h2 className="font-display text-2xl font-semibold text-paper">Portfolio audit report</h2>
-        <p className="text-sm text-paper/80 mt-1 font-sans">
-          Generate an end-to-end portfolio analysis across all invoices in the system.
+        <h2 className="font-display text-2xl font-semibold text-paper">Reports</h2>
+        <p className="text-sm text-paper/60 mt-1">
+          Generate compliance and exposure reports across your vendor portfolio.
         </p>
       </div>
 
-      <form onSubmit={handleGenerate} className="paper-surface rounded-xl p-6 text-ink space-y-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <label className="block text-sm font-semibold text-ink">
-            From
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="mt-1 w-full bg-paper border border-ink-600/30 rounded-md px-3 py-2 text-sm font-mono text-ink font-medium"
-            />
+      {/* Form */}
+      <form onSubmit={handleGenerate} className="bg-ink-800 border border-ink-600/40 rounded-xl p-6 space-y-6">
+        {/* Date Range */}
+        <div className="space-y-3">
+          <label className="text-xs font-mono font-bold uppercase tracking-widest text-paper/40 block">
+            Reporting Period
           </label>
-          <label className="block text-sm font-semibold text-ink">
-            To
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="mt-1 w-full bg-paper border border-ink-600/30 rounded-md px-3 py-2 text-sm font-mono text-ink font-medium"
-            />
-          </label>
-        </div>
-
-        <label className="block text-sm font-semibold text-ink">
-          Minimum risk score filter: <span className="text-stamp-red font-mono font-bold">{minRisk}</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={minRisk}
-            onChange={(e) => setMinRisk(Number(e.target.value))}
-            className="mt-2 w-full accent-stamp-red"
-          />
-        </label>
-
-        <fieldset>
-          <legend className="text-sm font-semibold text-ink mb-2">Filter by exception types</legend>
-          <div className="flex flex-wrap gap-2">
-            {EXCEPTION_TYPES.map((t) => (
+          <div className="flex flex-wrap gap-3">
+            {[
+              { val: "7", label: "Last 7 Days" },
+              { val: "30", label: "Last 30 Days" },
+              { val: "90", label: "Last 90 Days" },
+              { val: "all", label: "All Time" },
+            ].map((opt) => (
               <button
+                key={opt.val}
                 type="button"
-                key={t}
-                onClick={() => toggleType(t)}
-                className={
-                  "text-xs font-mono px-3 py-1.5 rounded-full border font-medium transition-colors " +
-                  (types.includes(t)
-                    ? "bg-stamp-red text-paper border-stamp-red shadow"
-                    : "bg-paper text-ink border-ink-600/30 hover:border-stamp-red")
-                }
+                onClick={() => setDateRange(opt.val)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border
+                            ${
+                              dateRange === opt.val
+                                ? "bg-ink-700 border-ink-600 text-paper"
+                                : "bg-transparent border-ink-600/30 text-paper/50 hover:border-ink-600/60 hover:text-paper"
+                            }`}
               >
-                {TYPE_LABELS[t] || t}
+                {opt.label}
               </button>
             ))}
           </div>
-        </fieldset>
+        </div>
 
-        <div className="flex justify-end pt-2">
+        {/* Exception Types */}
+        <div className="space-y-3">
+          <label className="text-xs font-mono font-bold uppercase tracking-widest text-paper/40 block">
+            Include Exception Types
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {EXCEPTION_OPTIONS.map((opt) => {
+              const active = exceptionTypes.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => toggleException(opt.id)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors
+                              ${
+                                active
+                                  ? "bg-ink-700/60 border-ink-600 text-paper"
+                                  : "bg-transparent border-ink-600/30 text-paper/40 hover:border-ink-600/60 hover:text-paper/70"
+                              }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded-sm border flex items-center justify-center shrink-0
+                                ${
+                                  active
+                                    ? "bg-stamp-red border-stamp-red"
+                                    : "border-ink-600/60"
+                                }`}
+                  >
+                    {active && <CheckCircle2 size={12} className="text-ink" strokeWidth={3} />}
+                  </div>
+                  <span className="text-sm font-medium">{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-stamp-red/10 border border-stamp-red/30 rounded-lg p-3 text-sm text-stamp-red flex items-center gap-2">
+            <ShieldAlert size={16} />
+            {error}
+          </div>
+        )}
+
+        <div className="pt-2">
           <button
             type="submit"
-            disabled={generating}
-            className="bg-stamp-red text-paper px-5 py-2.5 rounded-lg text-sm font-medium
-                       disabled:opacity-50 hover:bg-stamp-red/90 active:scale-[0.97]
-                       transition-all duration-150 shadow-elev-1"
+            disabled={loading}
+            className="flex items-center justify-center gap-2 w-full sm:w-auto bg-stamp-red text-paper
+                       px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-stamp-red/90
+                       active:scale-[0.97] disabled:opacity-50 transition-all"
           >
-            {generating ? "Running portfolio analysis…" : "Generate report"}
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-paper/20 border-t-paper rounded-full animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>
+                <BarChart2 size={16} />
+                Generate Report
+              </>
+            )}
           </button>
         </div>
       </form>
 
-      {result && (
-        <div className="space-y-6">
-          {/* Executive Summary Card */}
-          <div className="bg-paper-surface rounded-lg p-6 border border-ink-600/30 text-ink space-y-4 shadow">
-            <div className="flex items-center justify-between flex-wrap gap-2 border-b border-ink-600/20 pb-3">
-              <h3 className="font-display text-xl font-semibold text-ink">Auditor Summary Report</h3>
-              <span className="text-xs font-mono bg-ink/10 px-3 py-1 rounded-full text-ink font-bold">
-                Range: {result.from} &rarr; {result.to}
-              </span>
+      {/* Results */}
+      {report && (
+        <div className="bg-ink-800 border border-ink-600/40 rounded-xl p-6 space-y-6 animate-slideUp">
+          <div className="flex items-center justify-between border-b border-ink-600/30 pb-4">
+            <div>
+              <h3 className="font-display text-lg font-semibold text-paper">Exposure Summary</h3>
+              <p className="text-xs text-paper/40 font-mono mt-1">
+                Generated {new Date().toLocaleString()}
+              </p>
             </div>
+            <button className="flex items-center gap-2 px-4 py-2 bg-ink-700/60 border border-ink-600/40
+                               rounded-lg text-sm font-medium text-paper/70 hover:text-paper hover:bg-ink-700 transition-colors">
+              <Download size={14} />
+              Export PDF
+            </button>
+          </div>
 
-            <p className="text-sm leading-relaxed font-sans text-ink font-medium">{result.summary}</p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
-              <div className="bg-paper rounded p-3 text-center border border-ink-600/20 shadow-sm">
-                <span className="text-xs text-ink-700 font-mono block font-bold">Invoices Analyzed</span>
-                <span className="font-display text-2xl font-bold text-ink">{result.invoices_analyzed}</span>
-              </div>
-              <div className="bg-paper rounded p-3 text-center border border-ink-600/20 shadow-sm">
-                <span className="text-xs text-stamp-red font-mono block font-bold">High Risk</span>
-                <span className="font-display text-2xl font-bold text-stamp-red">{result.high_risk_count}</span>
-              </div>
-              <div className="bg-paper rounded p-3 text-center border border-ink-600/20 shadow-sm">
-                <span className="text-xs text-stamp-amber font-mono block font-bold">ITC at Risk</span>
-                <span className="font-display text-xl font-bold text-stamp-amber">{fmtCurrency(result.itc_at_risk_inr)}</span>
-              </div>
-              <div className="bg-paper rounded p-3 text-center border border-ink-600/20 shadow-sm">
-                <span className="text-xs text-ink-700 font-mono block font-bold">MSME Penalty</span>
-                <span className="font-display text-xl font-bold text-ink">{fmtCurrency(result.msme_penalty_exposure_inr)}</span>
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 bg-ink-700/30 rounded-lg border border-ink-600/20">
+              <p className="text-[10px] font-mono text-paper/40 uppercase tracking-widest mb-1">Total Flags</p>
+              <p className="text-2xl font-display font-bold text-paper">{report.totalFlags}</p>
+            </div>
+            <div className="p-4 bg-stamp-red/10 rounded-lg border border-stamp-red/20">
+              <p className="text-[10px] font-mono text-stamp-red/70 uppercase tracking-widest mb-1">High Risk</p>
+              <p className="text-2xl font-display font-bold text-stamp-red">{report.highRiskCount}</p>
+            </div>
+            <div className="p-4 bg-stamp-amber/10 rounded-lg border border-stamp-amber/20">
+              <p className="text-[10px] font-mono text-stamp-amber/70 uppercase tracking-widest mb-1">Total Exposure</p>
+              <p className="text-2xl font-display font-bold text-stamp-amber">
+                {fmtCurrency(report.totalExposureInr)}
+              </p>
+            </div>
+            <div className="p-4 bg-ink-700/30 rounded-lg border border-ink-600/20">
+              <p className="text-[10px] font-mono text-paper/40 uppercase tracking-widest mb-1">Vendors Affected</p>
+              <p className="text-2xl font-display font-bold text-paper">{report.vendorsAffected}</p>
             </div>
           </div>
 
-          {/* Insufficient Data Warnings */}
-          {result.insufficient_data_notes?.length > 0 && (
-            <div className="bg-paper-dim border-l-4 border-stamp-amber border border-l-stamp-amber rounded-lg p-5 text-ink space-y-2 shadow-sm">
-              <h4 className="text-xs uppercase tracking-wider font-mono font-bold text-stamp-amber flex items-center gap-2">
-                <span>⚠</span> Historical Evidence Sample Size Notes
-              </h4>
-              <ul className="space-y-1.5 text-xs font-mono text-ink font-medium">
-                {result.insufficient_data_notes.map((note, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-stamp-amber shrink-0">•</span>
-                    <span>{sanitiseReason(note.message)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-
-          {/* Flagged Invoices Breakdown */}
-          {result.flagged_invoices?.length > 0 && (
-            <div className="paper-surface rounded-xl p-6 text-ink space-y-4 active:scale-[0.995] transition-transform">
-              <h4 className="font-display text-lg font-semibold text-ink">Flagged Invoice Portfolio Detail</h4>
-              <div className="space-y-3">
-                {result.flagged_invoices.map((inv) => (
-                  <div key={inv.id} className="border border-ink-600/20 rounded-md p-4 space-y-2 hover:border-ink-600/40 transition bg-paper shadow-sm">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-sm text-stamp-red">{inv.invoice_number}</span>
-                        <span className="text-xs font-mono text-ink-700 font-medium">{inv.vendor_name} ({inv.vendor_gstin})</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-sm font-bold text-ink">{fmtCurrency(inv.total_amount)}</span>
-                        <span className="stamp-badge text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-stamp-red/10 text-stamp-red border border-stamp-red/30">
-                          Score: {inv.risk_score}
-                        </span>
-                      </div>
-                    </div>
-
-                    {inv.tickets?.length > 0 && (
-                      <div className="space-y-1.5 pt-1">
-                        {inv.tickets.map((t) => (
-                          <div key={t.id} className="text-xs bg-paper-surface p-2 rounded border border-ink-600/10">
-                            <span className="font-mono font-bold text-stamp-red block">{t.check}</span>
-                            <p className="text-ink font-medium mt-0.5">{mode === "msme" ? (t.msme_narrative || t.narrative) : t.narrative}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+          <div>
+            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-paper/40 mb-3">
+              Breakdown by Category
+            </h4>
+            <div className="space-y-2">
+              {report.breakdown.map((item, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-ink-700/20 border border-ink-600/10 rounded-lg">
+                  <span className="text-sm text-paper/70">{item.type.replace(/_/g, " ")}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs font-mono text-paper/40">{item.count} flags</span>
+                    <span className="text-sm font-mono font-semibold text-stamp-amber">
+                      {fmtCurrency(item.exposure)}
+                    </span>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>

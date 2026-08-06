@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
+import { ShieldCheck, User, Building } from "lucide-react";
 
 const ROLE_INFO = {
   auditor: {
-    icon: "🔍",
+    icon: ShieldCheck,
     title: "Auditor",
     subtitle: "Full access — resolve tickets, edit invoices, manage folders",
     accent: "border-stamp-red",
     badge: "bg-stamp-red/15 text-stamp-red border-stamp-red/30",
   },
   msme: {
-    icon: "📄",
+    icon: Building,
     title: "MSME / Vendor",
     subtitle: "Read-only — view flagged invoices and plain-language advice",
     accent: "border-stamp-green",
@@ -51,15 +52,15 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md space-y-8">
         {/* Logo */}
         <div className="text-center space-y-3">
-          <div className="stamp-badge w-16 h-16 text-stamp-red text-[11px] font-mono font-bold flex items-center justify-center mx-auto">
-            IRS
+          <div className="w-14 h-14 rounded-xl bg-stamp-red/90 flex items-center justify-center mx-auto shadow-sm">
+            <ShieldCheck size={28} strokeWidth={2.5} className="text-paper" />
           </div>
           <div>
-            <h1 className="font-display text-3xl font-semibold text-paper">
-              Invoice Risk Scanner
+            <h1 className="font-display text-4xl font-bold text-paper tracking-tight">
+              TETRA
             </h1>
-            <p className="text-paper/50 text-sm font-mono mt-1 tracking-wide">
-              rule → cache → AI
+            <p className="text-paper/50 text-sm font-mono mt-1 tracking-wide uppercase">
+              Invoice Risk Intelligence
             </p>
           </div>
         </div>
@@ -67,7 +68,7 @@ export default function LoginPage() {
         {/* Login card */}
         <form
           onSubmit={handleSubmit}
-          className={`bg-ink-800 rounded-xl border border-ink-600/60 p-7 space-y-6 shadow-2xl transition-transform ${
+          className={`bg-ink-800 rounded-2xl border border-ink-600/60 p-7 space-y-6 shadow-2xl transition-transform ${
             shaking ? "animate-[shake_0.4s_ease-in-out]" : ""
           }`}
         >
@@ -80,6 +81,7 @@ export default function LoginPage() {
               {(["auditor", "msme"]).map((role) => {
                 const info = ROLE_INFO[role];
                 const active = selectedRole === role;
+                const Icon = info.icon;
                 return (
                   <button
                     key={role}
@@ -89,15 +91,21 @@ export default function LoginPage() {
                       setError("");
                       setPassword("");
                     }}
-                    className={`rounded-lg border-2 p-3.5 text-left transition-all ${
+                    className={`rounded-xl border-2 p-3.5 text-left transition-all duration-150 ${
                       active
-                        ? `${info.accent} bg-paper/5`
-                        : "border-ink-600/40 hover:border-ink-600 bg-transparent"
+                        ? `${info.accent} bg-ink-700/60 shadow-sm`
+                        : "border-ink-600/40 hover:border-ink-600 hover:bg-ink-700/30"
                     }`}
                   >
-                    <div className="text-xl mb-1">{info.icon}</div>
-                    <div className="font-semibold text-paper text-sm">{info.title}</div>
-                    <div className="text-paper/50 text-[10px] font-mono leading-tight mt-0.5">
+                    <Icon
+                      size={20}
+                      strokeWidth={1.8}
+                      className={`mb-2.5 ${active ? "text-paper" : "text-paper/50"}`}
+                    />
+                    <div className={`font-semibold text-sm ${active ? "text-paper" : "text-paper/70"}`}>
+                      {info.title}
+                    </div>
+                    <div className="text-paper/50 text-[10px] font-mono leading-tight mt-1">
                       {info.subtitle}
                     </div>
                   </button>
@@ -124,7 +132,9 @@ export default function LoginPage() {
                 setError("");
               }}
               placeholder={`${ROLE_INFO[selectedRole].title} password`}
-              className="w-full bg-ink border border-ink-600/50 rounded-lg px-4 py-3 text-paper font-mono text-sm placeholder-paper/25 focus:outline-none focus:border-paper/40 transition-colors"
+              className="w-full bg-ink border border-ink-600/50 rounded-lg px-4 py-3
+                         text-paper font-mono text-sm placeholder-paper/25
+                         focus:outline-none focus:border-paper/40 transition-colors"
             />
             {error && (
               <p className="text-stamp-red text-xs font-mono mt-1">{error}</p>
@@ -135,11 +145,11 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={!password}
-            className={`w-full py-3 rounded-lg font-semibold text-sm transition-all ${
+            className={`w-full py-3 rounded-lg font-semibold text-sm transition-all shadow-sm ${
               selectedRole === "auditor"
                 ? "bg-stamp-red hover:bg-stamp-red/90 text-paper disabled:opacity-40"
                 : "bg-stamp-green hover:bg-stamp-green/90 text-paper disabled:opacity-40"
-            } disabled:cursor-not-allowed shadow`}
+            } disabled:cursor-not-allowed`}
           >
             Sign in as {ROLE_INFO[selectedRole].title}
           </button>
@@ -163,10 +173,12 @@ export default function LoginPage() {
         </form>
 
         {/* Security disclaimer */}
-        <p className="text-center text-paper/25 text-[10px] font-mono leading-relaxed max-w-sm mx-auto">
-          ⚠ Demo-grade access control — passwords are shared and validated
-          client-side. Not suitable for production. Role is enforced on
-          write API calls via X-Role header.
+        <p className="text-center text-paper/25 text-[10px] font-mono leading-relaxed max-w-sm mx-auto flex items-center justify-center gap-1.5">
+          <User size={12} strokeWidth={2} className="shrink-0" />
+          <span>
+            Demo-grade access control — passwords are shared and validated
+            client-side. Role is enforced via X-Role header.
+          </span>
         </p>
       </div>
 

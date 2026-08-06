@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { sanitiseReason } from "../utils/format.js";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 /**
- * FindingRow — renders one exception flag entry.
+ * FindingRow — renders one exception flag entry (used in InvoiceDetail).
  *
  * Default view (for everyone): clean human-readable narrative.
  * "Show technical detail" toggle (collapsed by default): raw reason string
@@ -11,8 +12,6 @@ import { sanitiseReason } from "../utils/format.js";
  * Props:
  *   flag         — { type, detail, rawReason, msmeNarrative, status, evidenceData }
  *   mode         — "auditor" | "msme"
- *   index        — index in the evidence chain (for the timeline dot)
- *   className    — optional extra classes on the wrapper
  */
 
 const EXCEPTION_TITLES = {
@@ -34,7 +33,7 @@ const STATUS_STYLES = {
   open: "bg-stamp-red/15 text-stamp-red border-stamp-red/30",
   "in-review": "bg-stamp-amber/15 text-stamp-amber border-stamp-amber/30",
   resolved: "bg-stamp-green/15 text-stamp-green border-stamp-green/30",
-  escalated: "bg-ink/10 text-paper/70 border-ink-600/30",
+  escalated: "bg-ink-700/60 text-paper/70 border-ink-600/40",
 };
 
 export default function FindingRow({ flag, mode = "auditor", children }) {
@@ -57,13 +56,14 @@ export default function FindingRow({ flag, mode = "auditor", children }) {
     : flag.type;
 
   return (
-    <div className="relative pl-6">
-      {/* Timeline dot */}
-      <div className="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-stamp-red border-2 border-paper" />
-
+    <div className="relative">
       {/* Flag header */}
       <div className="flex items-center gap-2 flex-wrap mb-1">
-        <span className="font-mono font-semibold text-sm text-stamp-red">{title}</span>
+        {title && (
+          <span className="font-mono font-semibold text-sm text-stamp-amber">
+            {title}
+          </span>
+        )}
         {flag.status && (
           <span
             className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full border ${STATUS_STYLES[flag.status] ?? ""}`}
@@ -75,7 +75,7 @@ export default function FindingRow({ flag, mode = "auditor", children }) {
       </div>
 
       {/* Clean human-readable narrative */}
-      <p className="text-xs text-ink leading-relaxed font-sans">
+      <p className="text-xs text-paper/70 leading-relaxed font-sans">
         {displayText || sanitiseReason(rawText) || "No details available."}
       </p>
 
@@ -84,17 +84,22 @@ export default function FindingRow({ flag, mode = "auditor", children }) {
         <div className="mt-2">
           <button
             onClick={() => setShowRaw((v) => !v)}
-            className="text-[10px] font-mono text-ink-600 hover:text-ink underline underline-offset-2 transition-colors"
+            className="flex items-center gap-1 text-[10px] font-mono text-paper/40 hover:text-paper/70 transition-colors"
             aria-expanded={showRaw}
           >
-            {showRaw ? "▲ Hide technical detail" : "▼ Show technical detail"}
+            {showRaw ? (
+              <ChevronUp size={12} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={12} strokeWidth={2} />
+            )}
+            {showRaw ? "Hide technical detail" : "Show technical detail"}
           </button>
           {showRaw && (
-            <div className="mt-1.5 bg-ink-800 border border-ink-600/40 rounded-md px-3 py-2.5 text-paper">
-              <p className="text-[10px] uppercase font-mono tracking-widest text-paper/40 mb-1.5">
-                Raw rule-engine output · audit precision
+            <div className="mt-2 bg-ink-800/50 border border-ink-600/30 rounded-md px-3 py-2.5">
+              <p className="text-[10px] uppercase font-mono tracking-widest text-paper/30 mb-1.5 font-bold">
+                Raw Rule-Engine Output
               </p>
-              <pre className="text-[11px] font-mono text-paper/80 whitespace-pre-wrap break-words leading-relaxed">
+              <pre className="text-[11px] font-mono text-paper/60 whitespace-pre-wrap break-words leading-relaxed">
                 {rawText}
               </pre>
             </div>
