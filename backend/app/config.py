@@ -45,3 +45,10 @@ CONFIDENCE_LOW_THRESHOLD = 0.80
 
 # --- Buyer (our company) identity, for inter/intra-state GST check ---
 BUYER_GSTIN = "24AABCU9876Q1Z8"  # Gujarat (state code 24) — adjust if your synthetic data uses a different home state
+
+# --- GSTIN Registry API keys (Tier 3 live verification) ---
+GSTINCHECK_API_KEY = os.getenv("GSTINCHECK_API_KEY", "")
+APPYFLOW_KEY_SECRET = os.getenv("APPYFLOW_KEY_SECRET", "")
+GSTIN_REGISTRY_MAX_CALLS = int(os.getenv("GSTIN_REGISTRY_MAX_CALLS", "50"))
+GSTIN_REGISTRY_TIMEOUT = int(os.getenv("GSTIN_REGISTRY_TIMEOUT", "10"))
+GSTIN_NAME_MATCH_THRESHOLD = int(os.getenv("GSTIN_NAME_MATCH_THRESHOLD", "70"))

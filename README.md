@@ -85,7 +85,7 @@ Risk Score (fraud likelihood) and Confidence Score (extraction certainty) are tr
 <img width="1520" height="1520" alt="image" src="https://github.com/user-attachments/assets/6ff7fbad-c62e-44a9-b67a-1b777154101b" />
 
 
-TETRA ingests invoices through a React (Vite + Tailwind) frontend, which talks to a
+IRS ingests invoices through a React (Vite + Tailwind) frontend, which talks to a
 FastAPI backend over REST. The backend orchestrator runs each invoice through a
 seven-stage pipeline:
 

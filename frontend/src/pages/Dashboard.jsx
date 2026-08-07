@@ -12,8 +12,7 @@ import RiskChart from "../components/RiskChart.jsx";
 import RiskDonut from "../components/RiskDonut.jsx";
 import ExceptionBarChart from "../components/ExceptionBarChart.jsx";
 import ExposureBarChart from "../components/ExposureBarChart.jsx";
-import FolderView from "../components/FolderView.jsx";
-import MsmeCountdown from "../components/MsmeCountdown.jsx";
+
 import { useAuth } from "../context/AuthContext.jsx";
 import {
   LineChart,
@@ -345,18 +344,6 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* ── MSME 45-Day Countdown ── */}
-      <div className="space-y-3">
-        <SectionHeading>MSME Payment Tracker</SectionHeading>
-        <MsmeCountdown />
-      </div>
-
-      {/* ── Vendor & Category Folders ── */}
-      <div className="space-y-3">
-        <SectionHeading>Invoice Folders</SectionHeading>
-        <FolderView />
       </div>
 
     </div>

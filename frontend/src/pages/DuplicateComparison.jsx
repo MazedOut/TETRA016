@@ -10,8 +10,8 @@ export default function DuplicateComparison() {
 
   useEffect(() => {
     Promise.all([
-      fetchInvoice(id),
-      fetchInvoice(targetId)
+      fetchInvoiceDetail(id),
+      fetchInvoiceDetail(targetId)
     ]).then(([a, b]) => {
       setInvA(a);
       setInvB(b);
@@ -70,7 +70,7 @@ export default function DuplicateComparison() {
           <div className="mt-4 pt-4 border-t border-ink-600/20">
             {invA.source_file_path ? (
               <iframe 
-                src={`http://localhost:8000/api/invoices/${invA.id}/file`} 
+                src={`/api/invoices/${invA.id}/file`} 
                 className="w-full h-96 border border-ink-600/20 rounded" 
                 title="Invoice A"
               />
@@ -109,7 +109,7 @@ export default function DuplicateComparison() {
           <div className="mt-4 pt-4 border-t border-ink-600/20">
             {invB.source_file_path ? (
               <iframe 
-                src={`http://localhost:8000/api/invoices/${invB.id}/file`} 
+                src={`/api/invoices/${invB.id}/file`} 
                 className="w-full h-96 border border-ink-600/20 rounded" 
                 title="Invoice B"
               />

@@ -238,6 +238,15 @@ export async function submitResolution(ticketId, payload) {
   return data;
 }
 
+export async function submitEscalation(ticketId, payload) {
+  if (USE_MOCK) {
+    await delay();
+    return { ok: true, ticketId, status: "escalated", ...payload };
+  }
+  const { data } = await client.post(`/tickets/${ticketId}/escalate`, payload);
+  return data;
+}
+
 export async function submitMergeDecision(payload) {
   if (USE_MOCK) {
     await delay();
@@ -339,6 +348,11 @@ export async function fetchMsmeCountdown() {
 
 export async function markMsmePaid(invoiceId) {
   const { data } = await client.post("/msme/mark-paid", { invoiceId });
+  return data;
+}
+
+export async function fetchGstinLogs() {
+  const { data } = await client.get("/gstin-logs");
   return data;
 }
 

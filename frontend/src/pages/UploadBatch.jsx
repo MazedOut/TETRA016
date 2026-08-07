@@ -58,7 +58,7 @@ export default function UploadBatch() {
       <div className="text-center space-y-2">
         <h2 className="font-display text-3xl font-bold text-paper">Upload Invoices</h2>
         <p className="text-sm text-paper/60 max-w-lg mx-auto">
-          Ingest invoices for automated risk screening. TETRA applies a three-stage
+          Ingest invoices for automated risk screening. IRS applies a three-stage
           pipeline to identify anomalies before they impact your ledger.
         </p>
       </div>

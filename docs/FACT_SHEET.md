@@ -6,7 +6,7 @@ produced by reading the actual repository (`backend/app/`, `frontend/src/`),
 not the plan docs in `docs/`.
 
 ## Project name
-Invoice Risk Scanner (AI-Assisted Invoice Risk Intelligence)
+Invoice Risk Scanner (AI-Assisted Invoice Risk Scanner)
 
 ## Problem
 Businesses process invoices manually or with basic OCR tools. Neither catches

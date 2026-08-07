@@ -6,8 +6,10 @@ import {
   verifySeal,
   fetchForensics,
   fetchAuditTrail,
+  fetchTickets,
 } from "../api/client.js";
 import ResolutionForm from "../components/ResolutionForm.jsx";
+import EscalationForm from "../components/EscalationForm.jsx";
 import VendorCorrectionForm from "../components/VendorCorrectionForm.jsx";
 import FindingRow from "../components/FindingRow.jsx";
 import { fmtCurrency } from "../utils/format.js";
@@ -253,6 +255,17 @@ export default function InvoiceDetail() {
   const [showAuditPanel, setShowAuditPanel] = useState(false);
   const [auditFilter, setAuditFilter] = useState("all");
   const [showForensicsDetail, setShowForensicsDetail] = useState(false);
+  const [showEscalate, setShowEscalate] = useState(false);
+  const [tickets, setTickets] = useState([]);
+
+  useEffect(() => {
+    if (invoice?.id) {
+      fetchTickets().then(allTickets => {
+        const myTickets = allTickets.filter(t => t.invoiceId === invoice.id);
+        setTickets(myTickets);
+      });
+    }
+  }, [invoice?.id]);
 
   useEffect(() => {
     fetchInvoiceDetail(id).then((inv) => {
@@ -345,12 +358,27 @@ export default function InvoiceDetail() {
               </span>
             )}
           </div>
-          <p className="text-sm text-paper/50 mt-0.5 font-sans">
-            {invoice.vendor}
+          <div className="text-sm text-paper/50 mt-0.5 font-sans flex items-center gap-2 flex-wrap">
+            <span>{invoice.vendor}</span>
             {invoice.gstin && (
-              <span className="ml-2 font-mono text-xs text-paper/30">{invoice.gstin}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs text-paper/30">{invoice.gstin}</span>
+                {invoice.registryStatus && (
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+                    invoice.registryStatus.registry_status === 'verified' 
+                      ? 'bg-stamp-green/10 text-stamp-green border-stamp-green/20'
+                      : invoice.registryStatus.registry_status === 'unchecked'
+                        ? 'bg-ink-600/20 text-paper/50 border-ink-600/30'
+                        : 'bg-stamp-red/10 text-stamp-red border-stamp-red/20'
+                  }`}>
+                    {invoice.registryStatus.registry_status === 'verified' ? 'Verified (Live)' : 
+                     invoice.registryStatus.registry_status === 'unchecked' ? 'Skipped / Cached' : 
+                     'Warning: ' + invoice.registryStatus.registry_status.toUpperCase()}
+                  </span>
+                )}
+              </div>
             )}
-          </p>
+          </div>
         </div>
 
         {/* Header action buttons */}
@@ -790,6 +818,53 @@ export default function InvoiceDetail() {
               </div>
             )}
 
+            {/* Government GSTIN Check */}
+            {invoice.registryStatus && (
+              <div className="border-t border-ink-600/20 pt-4 space-y-2">
+                <p className="text-[10px] font-mono uppercase tracking-widest text-paper/30 font-bold">
+                  Government GSTIN Check
+                </p>
+                <div className="bg-ink-800 rounded-lg p-3 text-xs space-y-2 font-mono">
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-paper/40">Legal Name:</span>
+                    <span className="col-span-2 text-paper truncate">{invoice.registryStatus.legal_name || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-paper/40">Trade Name:</span>
+                    <span className="col-span-2 text-paper truncate">{invoice.registryStatus.trade_name || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-paper/40">GST Status:</span>
+                    <span className={`col-span-2 font-bold ${
+                      invoice.registryStatus.registry_status === 'verified' ? 'text-stamp-green' : 'text-stamp-red'
+                    }`}>
+                      {invoice.registryStatus.gst_status || '-'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-paper/40">Address:</span>
+                    <span className="col-span-2 text-paper truncate" title={invoice.registryStatus.address}>
+                      {invoice.registryStatus.address || '-'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 border-t border-ink-600/20 pt-2 mt-2">
+                    <span className="text-paper/40">Provider:</span>
+                    <span className="col-span-2 text-paper/70">{invoice.registryStatus.source_provider}</span>
+                  </div>
+                  {invoice.registryStatus.name_match_score !== undefined && (
+                    <div className="grid grid-cols-3 gap-2">
+                      <span className="text-paper/40">Name Match:</span>
+                      <span className={`col-span-2 font-bold ${
+                        invoice.registryStatus.name_match_score >= 70 ? 'text-stamp-green' : 'text-stamp-red'
+                      }`}>
+                        {invoice.registryStatus.name_match_score}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Recommended Action */}
             {canWrite && (
               <div className="border-t border-ink-600/20 pt-4 space-y-2">
@@ -809,7 +884,7 @@ export default function InvoiceDetail() {
                     {resolved ? "Resolved" : "Resolve"}
                   </button>
                   <button
-                    onClick={() => {/* escalate — uses resolve form */setShowResolve(true)}}
+                    onClick={() => setShowEscalate(true)}
                     className="flex items-center justify-center gap-1.5 bg-stamp-amber/10
                                 border border-stamp-amber/25 text-stamp-amber text-xs font-medium
                                 py-2 px-3 rounded-lg hover:bg-stamp-amber/15 transition-all duration-150"
@@ -980,9 +1055,16 @@ export default function InvoiceDetail() {
       )}
       {showResolve && (
         <ResolutionForm
-          ticketId={invoice.id}
+          ticketId={tickets[0]?.id || invoice.id}
           onClose={() => setShowResolve(false)}
           onResolved={() => setResolved(true)}
+        />
+      )}
+      {showEscalate && (
+        <EscalationForm
+          ticketId={tickets[0]?.id || invoice.id}
+          onClose={() => setShowEscalate(false)}
+          onEscalated={() => setResolved(true)}
         />
       )}
       {showVendorCorrect && (

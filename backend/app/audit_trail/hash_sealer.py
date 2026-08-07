@@ -5,7 +5,7 @@ import json
 import datetime as dt
 from app.config import GEMINI_API_KEY  # reuse as HMAC secret for demo
 
-SEAL_SECRET = (GEMINI_API_KEY or "tetra-hackathon-seal-secret-2026").encode()
+SEAL_SECRET = (GEMINI_API_KEY or "irs-hackathon-seal-secret-2026").encode()
 
 def seal(record: dict) -> str:
     """Deterministic hash over the finalized invoice record."""

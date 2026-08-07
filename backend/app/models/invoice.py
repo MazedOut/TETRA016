@@ -37,5 +37,6 @@ class Invoice(Base):
     seal_signature = Column(String, nullable=True)         # HMAC-SHA256 signature
     sealed_at = Column(DateTime, nullable=True)            # when seal was applied
     forensic_metadata = Column(JSON, nullable=True)        # pikepdf/fitz forensic results
+    registry_status = Column(JSON, nullable=True)          # Tier 3 GSTIN registry result (independent signal)
     pipeline_log = Column(JSON, nullable=True)             # array of {event, detail, timestamp, actor} entries
     created_at = Column(DateTime)

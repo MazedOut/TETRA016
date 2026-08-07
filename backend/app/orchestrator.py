@@ -140,6 +140,32 @@ def process_invoice(
 
     flags.extend(gstin_validate(norm))
 
+    # Tier 3: Live GSTIN registry check (DEMO MODE: Run for ALL invoices)
+    registry_result = None
+    if True: # Demo Mode Override: Run registry check on every invoice
+        gstin_to_check = norm.get("vendor_gstin")
+        print(f"--- [START] Live GSTIN Registry Check for: {gstin_to_check} ---")
+        from app.reconciliation.gstin_registry import verify_gstin_registry
+        registry_result = verify_gstin_registry(
+            gstin_to_check,
+            invoice_vendor_name=norm.get("vendor_name")
+        )
+        print(f"--- [END] GSTIN Registry Check Result: {registry_result} ---")
+        
+        # Exception Generation: if the status is bad, generate a flag so a Ticket is created
+        if registry_result:
+            status = registry_result.get("registry_status")
+            if status in ("cancelled", "suspended"):
+                flags.append({
+                    "check": "gstin_registry_failed",
+                    "reason": f"GSTIN is {status.upper()}. Legal name: {registry_result.get('legal_name', 'Unknown')}."
+                })
+            elif status == "mismatch":
+                flags.append({
+                    "check": "gstin_name_mismatch",
+                    "reason": registry_result.get("mismatch_reason", "Vendor name does not match registry data.")
+                })
+
     # duplicate check against everything already saved in the DB
     existing = db.query(Invoice).all()
     existing_dicts = [{
@@ -209,6 +235,7 @@ def process_invoice(
         ocr_source=extraction.get("ocr_source", "tesseract"),
         folder=sort_res.get("folder", "extra"),
         source_file_path=filename,
+        registry_status=registry_result,
         created_at=dt.datetime.utcnow(),
     )
     db.add(inv)

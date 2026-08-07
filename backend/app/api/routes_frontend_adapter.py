@@ -327,6 +327,14 @@ def resolve_ticket(ticket_id: str, payload: dict, db: Session = Depends(get_db),
         t = update_status(db, real_id, "resolved", actor, reason)
     return {"ok": True, "ticketId": ticket_id, "status": t.status}
 
+@router.post("/tickets/{ticket_id}/escalate")
+def escalate_ticket(ticket_id: str, payload: dict, db: Session = Depends(get_db), _: None = Depends(_require_auditor)):
+    real_id = int(ticket_id.replace("TCK-", ""))
+    actor = payload.get("actor", "auditor")
+    reason = payload.get("reason", "Escalated by auditor")
+    t = update_status(db, real_id, "escalated", actor, reason)
+    return {"ok": True, "ticketId": ticket_id, "status": t.status}
+
 @router.post("/tickets/bulk-resolve")
 def bulk_resolve_tickets(payload: dict, db: Session = Depends(get_db), _: None = Depends(_require_auditor)):
     ticket_ids = payload.get("ticketIds", [])
@@ -415,6 +423,7 @@ def invoice_detail(invoice_id: str, db: Session = Depends(get_db)):
             "sealed_at": inv.sealed_at.isoformat() if inv.sealed_at else None,
         } if inv.record_hash else None,
         "forensicMetadata": inv.forensic_metadata,
+        "registryStatus": inv.registry_status,
     }
 
 @router.post("/invoices/upload")
@@ -636,5 +645,25 @@ def msme_mark_paid(payload: dict, db: Session = Depends(get_db), _: None = Depen
         "invoiceId": invoice_id,
         "resolvedTickets": resolved_count
     }
+
+
+@router.get("/gstin-logs")
+def get_gstin_logs():
+    """Return all GSTIN registry checks from the cache file."""
+    import os
+    import json
+    # Use the same path resolution as in gstin_registry.py
+    cache_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "synthetic_data", "output", "gstin_registry_cache.json"
+    )
+    if not os.path.exists(cache_path):
+        return []
+    try:
+        with open(cache_path, "r") as f:
+            data = json.load(f)
+        # Convert dictionary format to list format with GSTIN included
+        return [{"gstin": k, **v} for k, v in data.items()]
+    except Exception as e:
+        return []
 
 

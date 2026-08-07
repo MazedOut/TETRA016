@@ -1,18 +1,17 @@
 import { useState } from "react";
-import { submitResolution } from "../api/client.js";
+import { submitEscalation } from "../api/client.js";
+import { AlertTriangle } from "lucide-react";
 
-/**
- * Ticket resolution form — mandatory reason, never a silent close.
- */
-const REASONS = [
-  "False positive — confirmed not an issue",
-  "Vendor corrected, ledger updated",
-  "Duplicate confirmed, invoice voided",
+const ESCALATION_REASONS = [
+  "Requires senior auditor review",
+  "Suspected fraud — needs investigation",
+  "Vendor dispute requires legal review",
+  "Complex multi-invoice issue",
   "Other (explain below)",
 ];
 
-export default function ResolutionForm({ ticketId, onClose, onResolved }) {
-  const [reason, setReason] = useState(REASONS[0]);
+export default function EscalationForm({ ticketId, onClose, onEscalated }) {
+  const [reason, setReason] = useState(ESCALATION_REASONS[0]);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -22,11 +21,11 @@ export default function ResolutionForm({ ticketId, onClose, onResolved }) {
     setSubmitting(true);
     setError(null);
     try {
-      await submitResolution(ticketId, { reason, note });
-      onResolved?.({ reason, note });
+      await submitEscalation(ticketId, { reason, note });
+      onEscalated?.({ reason, note });
       onClose?.();
     } catch (err) {
-      setError(err?.response?.data?.detail || "Failed to resolve ticket. Please try again.");
+      setError(err?.response?.data?.detail || "Failed to escalate ticket. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -35,9 +34,14 @@ export default function ResolutionForm({ ticketId, onClose, onResolved }) {
   return (
     <div className="fixed inset-0 bg-ink/70 flex items-center justify-center z-50 p-4">
       <form onSubmit={handleSubmit} className="paper-surface rounded-lg p-6 w-full max-w-md text-ink space-y-4">
-        <div>
-          <h3 className="font-display text-lg font-semibold">Resolve {ticketId}</h3>
-          <p className="text-xs text-ink-600 mt-1">A reason is required — nothing closes silently.</p>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-stamp-amber/10 border border-stamp-amber/25 flex items-center justify-center">
+            <AlertTriangle size={14} className="text-stamp-amber" strokeWidth={2} />
+          </div>
+          <div>
+            <h3 className="font-display text-lg font-semibold">Escalate {ticketId}</h3>
+            <p className="text-xs text-ink-600 mt-0.5">This will flag the ticket for senior review.</p>
+          </div>
         </div>
 
         {error && (
@@ -47,13 +51,13 @@ export default function ResolutionForm({ ticketId, onClose, onResolved }) {
         )}
 
         <label className="block text-sm font-medium">
-          Reason
+          Escalation Reason
           <select
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             className="mt-1 w-full bg-paper border border-ink-600/30 rounded-md px-3 py-2 text-sm"
           >
-            {REASONS.map((r) => (
+            {ESCALATION_REASONS.map((r) => (
               <option key={r}>{r}</option>
             ))}
           </select>
@@ -66,7 +70,7 @@ export default function ResolutionForm({ ticketId, onClose, onResolved }) {
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             required
-            placeholder="What did you check, and what did you find?"
+            placeholder="Why does this need escalation? What should the reviewer focus on?"
             className="mt-1 w-full bg-paper border border-ink-600/30 rounded-md px-3 py-2 text-sm"
           />
         </label>
@@ -78,9 +82,9 @@ export default function ResolutionForm({ ticketId, onClose, onResolved }) {
           <button
             type="submit"
             disabled={submitting}
-            className="bg-stamp-red text-paper px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+            className="bg-stamp-amber text-ink px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
           >
-            {submitting ? "Saving…" : "Resolve ticket"}
+            {submitting ? "Escalating…" : "Escalate ticket"}
           </button>
         </div>
       </form>

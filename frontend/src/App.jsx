@@ -9,6 +9,8 @@ import DuplicateComparison from "./pages/DuplicateComparison.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import VendorsPage from "./pages/VendorsPage.jsx";
 import AuditTrailPage from "./pages/AuditTrailPage.jsx";
+import MsmeTrackerPage from "./pages/MsmeTrackerPage.jsx";
+import GstinLookupsPage from "./pages/GstinLookupsPage.jsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { resetDemoData } from "./api/client.js";
 import { useState } from "react";
@@ -24,6 +26,7 @@ import {
   LogOut,
   ShieldCheck,
   ChevronRight,
+  Timer,
 } from "lucide-react";
 
 // ─── Sidebar nav section heading ───────────────────────────────────────────
@@ -86,10 +89,10 @@ function Shell({ children }) {
             </div>
             <div>
               <h1 className="font-display text-[15px] font-bold leading-none text-paper tracking-tight">
-                TETRA
+                IRS
               </h1>
               <p className="text-[10px] font-mono text-ink-600 mt-0.5 leading-none">
-                Invoice Risk Intelligence
+                Invoice Risk Scanner
               </p>
             </div>
           </div>
@@ -106,6 +109,10 @@ function Shell({ children }) {
           <NavSection label="Operations" />
           <SidebarLink to="/upload" icon={Upload} label="Upload Batch" />
           <SidebarLink to="/reports" icon={BarChart2} label="Reports" />
+
+          <NavSection label="Tools" />
+          <SidebarLink to="/msme-tracker" icon={Timer} label="MSME Tracker" />
+          <SidebarLink to="/gstin-logs" icon={ShieldCheck} label="GSTIN Lookups" />
 
           <NavSection label="Control" />
           <SidebarLink to="/audit-trail" icon={Clock} label="Audit Trail" />
@@ -167,7 +174,7 @@ function Shell({ children }) {
         </main>
         <footer className="border-t border-ink-700/40 py-3 px-8">
           <p className="text-[11px] font-mono text-ink-600 max-w-[1320px] mx-auto">
-            TETRA · rule → cache → AI · Every place the model could be wrong, there&apos;s a form, not an assumption.
+            IRS · rule → cache → AI · Every place the model could be wrong, there&apos;s a form, not an assumption.
             {!canWrite && (
               <span className="ml-3 text-stamp-green/70">MSME view — read-only</span>
             )}
@@ -237,6 +244,8 @@ function AppRoutes() {
         <Route path="/invoices/:id/compare/:targetId" element={<DuplicateComparison />} />
         <Route path="/vendors" element={<VendorsPage />} />
         <Route path="/audit-trail" element={<AuditTrailPage />} />
+        <Route path="/msme-tracker" element={<MsmeTrackerPage />} />
+        <Route path="/gstin-logs" element={<GstinLookupsPage />} />
       </Routes>
     </Shell>
   );

@@ -57,10 +57,10 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="font-display text-4xl font-bold text-paper tracking-tight">
-              TETRA
+              IRS
             </h1>
             <p className="text-paper/50 text-sm font-mono mt-1 tracking-wide uppercase">
-              Invoice Risk Intelligence
+              Invoice Risk Scanner
             </p>
           </div>
         </div>

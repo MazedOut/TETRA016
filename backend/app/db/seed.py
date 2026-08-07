@@ -132,6 +132,22 @@ def seed():
 
         db.commit()
 
+        # Step 5.5: Seed Mock GSTIN Lookups for Demo
+        from app.reconciliation.gstin_registry import _cache
+        mock_logs = {
+            "29ABCDE1234F1Z5": {"registry_status": "verified", "legal_name": "ACME CORP", "trade_name": "Acme Solutions", "gst_status": "Active", "address": "123 Tech Park, Bangalore", "source_provider": "gstincheck", "name_match_score": 95},
+            "27XYZXY9876G1Z2": {"registry_status": "cancelled", "legal_name": "GLOBAL TRADERS", "trade_name": "Global Traders", "gst_status": "Cancelled", "address": "45 Market St, Mumbai", "source_provider": "appyflow", "name_match_score": 88},
+            "33PQRST4567H1Z9": {"registry_status": "mismatch", "legal_name": "STEEL AUTHORITY", "trade_name": "SAIL", "gst_status": "Active", "address": "78 Industrial Area, Chennai", "source_provider": "gstincheck", "name_match_score": 42},
+            "07LMNOP5555I1Z3": {"registry_status": "verified", "legal_name": "NEXUS LOGISTICS", "trade_name": "Nexus", "gst_status": "Active", "address": "Okhla Phase 1, Delhi", "source_provider": "gstincheck", "name_match_score": 100},
+            "24UVWXY3333J1Z4": {"registry_status": "suspended", "legal_name": "GUJARAT TEXTILES", "trade_name": "GujTex", "gst_status": "Suspended", "address": "Surat Ring Road", "source_provider": "appyflow", "name_match_score": 91},
+            "06QWERT2222K1Z8": {"registry_status": "unchecked", "reason": "Timeout/Network Error", "source_provider": "gstincheck"},
+            "36ASDFG1111L1Z1": {"registry_status": "verified", "legal_name": "HYDERABAD IT SOLUTIONS", "trade_name": "HIT Solutions", "gst_status": "Active", "address": "Hitech City, Hyderabad", "source_provider": "appyflow", "name_match_score": 75},
+            "09ZXCVB6666M1Z7": {"registry_status": "verified", "legal_name": "UP ENTERPRISES", "trade_name": "UP Ent", "gst_status": "Active", "address": "Noida Sector 62", "source_provider": "gstincheck", "name_match_score": 82}
+        }
+        for gstin, data in mock_logs.items():
+            _cache.set(gstin, data)
+        print("      Seeded 8 mock GSTIN lookup logs for demo.")
+
         # Step 6: Print final summary
         invoice_count = db.query(Invoice).count()
         ticket_count = db.query(Ticket).count()
